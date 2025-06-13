@@ -1,0 +1,1609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive AWS Ecosystem Explorer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chosen Palette: Warm Neutrals (Background: Amber-50, Text: Gray-800, Primary Accent: Teal-600, Secondary Accent: Amber-500) -->
+    <!-- Application Structure Plan: The application is designed as a single-page, multi-view dashboard to facilitate non-linear exploration of the AWS Ecosystem. This structure was chosen over a linear report format to empower different user personas (developers, architects, security specialists) to enter the content from the perspective most relevant to them. The key views are: 1) Service Categories: A foundational, encyclopedic view to explore services by their official grouping, now including Container services and Hybrid Cloud. 2) Architectural Patterns: A practical view showing how services combine to form real-world solutions like microservices, event-driven architectures, and data processing pipelines, with more detailed diagrams. 3) Core Concepts: A focused, comparative view for deep-diving into critical distinctions like Security Groups vs. NACLs and Identity vs. Resource Policies, highlighting cross-account/organizational implications. 4) Well-Architected Framework: A strategic lens to understand how services align with AWS best practices, with expanded pillars and service associations. This multi-faceted approach transforms a static report into an interactive learning tool, maximizing user understanding and engagement by making the complex relationships between services tangible and explorable across Regions, Accounts, and Organizations. -->
+    <!-- Visualization & Content Choices: Report Info -> Goal -> Viz/Presentation Method -> Interaction -> Justification. 1) Service Relationships -> Goal: Visualize connections -> Viz: Chart.js Polar Area Chart -> Interaction: Clicking a service generates a chart showing its dependencies, now with more nuanced relationship descriptions explicitly mentioning Region/Account/OU/Org where applicable -> Justification: Makes abstract text-based relationships immediately visible and engaging, including hierarchy. 2) Architectural Patterns -> Goal: Explain process flows -> Viz: HTML/CSS Flexbox diagrams with borders/arrows -> Interaction: Clickable service nodes in the diagram link to detailed views -> Justification: Provides a clear, interactive flowchart without violating the NO SVG/Mermaid constraint. 3) Comparative Data (Security Groups vs. NACLs, Identity vs. Resource Policies) -> Goal: Compare/Contrast -> Viz: Two-column HTML table layout -> Interaction: Buttons to switch between different comparison topics -> Justification: Offers a clear, side-by-side format for easy analysis of critical distinctions. 4) Main Navigation -> Goal: Organize content -> Viz: Tab-based navigation -> Interaction: Clicks switch between the application's main views -> Justification: Enables the non-linear, multi-perspective exploration central to the application's design. The use of icons and consistent styling enhances usability and visual appeal. -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        .view {
+            display: none;
+        }
+        .view.active {
+            display: block;
+        }
+        .chart-container {
+            position: relative;
+            margin: auto;
+            height: 40vh;
+            max-height: 400px;
+            width: 95%;
+            max-width: 500px;
+        }
+        .diagram-arrow {
+            position: relative;
+            flex-grow: 1;
+            background-color: #cbd5e1;
+            height: 2px;
+            margin: 0 8px;
+        }
+        .diagram-arrow::after {
+            content: '';
+            position: absolute;
+            right: -1px;
+            top: -4px;
+            border: solid #4a5568;
+            border-width: 0 2px 2px 0;
+            display: inline-block;
+            padding: 4px;
+            transform: rotate(-45deg);
+        }
+        .prose-custom h3 {
+           font-size: 1.125rem;
+           font-weight: 600;
+           margin-top: 1.5rem;
+           margin-bottom: 0.5rem;
+        }
+        .prose-custom p {
+           margin-bottom: 1rem;
+           line-height: 1.6;
+        }
+       .prose-custom ul {
+           list-style-position: inside;
+           list-style-type: disc;
+           padding-left: 1rem;
+           margin-bottom: 1rem;
+       }
+       .prose-custom li {
+           margin-bottom: 0.5rem;
+       }
+        .pattern-card {
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+        .pattern-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+    </style>
+</head>
+<body class="bg-amber-50 text-gray-800">
+
+    <header class="bg-white shadow-md sticky top-0 z-20">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex-shrink-0">
+                    <h1 class="text-2xl font-bold text-teal-700">AWS Ecosystem Explorer</h1>
+                </div>
+                <nav class="hidden md:block">
+                    <div id="main-nav" class="ml-10 flex items-baseline space-x-4">
+                        <button data-view="categories" class="nav-link text-gray-600 hover:bg-gray-100 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Service Categories</button>
+                        <button data-view="patterns" class="nav-link text-gray-600 hover:bg-gray-100 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Architectural Patterns</button>
+                        <button data-view="concepts" class="nav-link text-gray-600 hover:bg-gray-100 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Core Concepts</button>
+                        <button data-view="framework" class="nav-link text-gray-600 hover:bg-gray-100 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Well-Architected</button>
+                    </div>
+                </nav>
+            </div>
+        </div>
+    </header>
+    
+    <main class="container mx-auto p-4 sm:p-6 lg:p-8">
+
+        <!-- View 1: Service Categories -->
+        <div id="categories-view" class="view active">
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-bold text-gray-900">Explore AWS Services by Category</h2>
+                <p class="mt-2 text-lg text-gray-600">Discover the building blocks of the AWS cloud. Select a category to reveal its core services, then click a service to explore its functions, key resources, and intricate relationships with the rest of the ecosystem, including vertical and horizontal interdependencies.</p>
+            </div>
+
+            <div id="category-selector" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+                <!-- Category buttons will be injected here -->
+            </div>
+
+            <div id="service-selector-container" class="mb-8 hidden">
+                 <h3 class="text-2xl font-semibold text-gray-800 mb-4 text-center">Select a Service</h3>
+                <div id="service-selector" class="flex flex-wrap justify-center gap-3">
+                    <!-- Service buttons will be injected here -->
+                </div>
+            </div>
+
+            <div id="service-detail-container" class="bg-white p-6 rounded-lg shadow-lg hidden">
+                <!-- Service details will be injected here -->
+            </div>
+        </div>
+
+        <!-- View 2: Architectural Patterns -->
+        <div id="patterns-view" class="view">
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-bold text-gray-900">Common Architectural Patterns</h2>
+                <p class="mt-2 text-lg text-gray-600">See how individual services are combined to create powerful, real-world solutions. Explore these common blueprints to understand the practical application of AWS interdependencies across various scales and scopes.</p>
+            </div>
+            <div id="patterns-container" class="space-y-12">
+                <!-- Architectural patterns will be injected here -->
+            </div>
+        </div>
+
+        <!-- View 3: Core Concepts -->
+        <div id="concepts-view" class="view">
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-bold text-gray-900">Core Concepts & Comparisons</h2>
+                <p class="mt-2 text-lg text-gray-600">Dive deep into fundamental AWS concepts. These side-by-side comparisons clarify the nuanced differences between key components, helping you make informed architectural decisions, particularly in complex multi-account or multi-Region environments.</p>
+            </div>
+             <div class="flex justify-center mb-6">
+                <div class="inline-flex rounded-md shadow-sm" role="group">
+                    <button type="button" data-concept="security" class="concept-btn px-4 py-2 text-sm font-medium text-white bg-teal-600 border border-gray-200 rounded-l-lg hover:bg-teal-700">
+                        Security Groups vs. NACLs
+                    </button>
+                    <button type="button" data-concept="iam" class="concept-btn px-4 py-2 text-sm font-medium text-gray-900 bg-white border-t border-b border-gray-200 hover:bg-gray-100">
+                        Identity vs. Resource Policies
+                    </button>
+                    <button type="button" data-concept="org_boundaries" class="concept-btn px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-200 rounded-r-lg hover:bg-gray-100">
+                        Account vs. OU vs. Organization
+                    </button>
+                </div>
+            </div>
+            <div id="concept-display" class="bg-white p-6 rounded-lg shadow-lg">
+                <!-- Concept details will be injected here -->
+            </div>
+        </div>
+
+        <!-- View 4: Well-Architected Framework -->
+        <div id="framework-view" class="view">
+             <div class="text-center mb-8">
+                <h2 class="text-3xl font-bold text-gray-900">The Well-Architected Framework Lens</h2>
+                <p class="mt-2 text-lg text-gray-600">View the AWS ecosystem through the lens of best practices. Select a pillar to see which services and principles are key to building secure, reliable, efficient, and cost-effective applications across different organizational and geographical scales.</p>
+            </div>
+             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="framework-pillars">
+                 <!-- Framework pillars will be injected here -->
+            </div>
+             <div id="framework-detail" class="mt-8 bg-white p-6 rounded-lg shadow-lg hidden">
+                 <!-- Pillar details will be injected here -->
+            </div>
+        </div>
+
+    </main>
+<script>
+const awsData = {
+    categories: [
+        { id: 'compute', name: 'Compute', icon: '💻' },
+        { id: 'containers', name: 'Containers', icon: '📦' },
+        { id: 'storage', name: 'Storage', icon: '💽' },
+        { id: 'database', name: 'Database', icon: '📊' },
+        { id: 'networking', name: 'Networking', icon: '🌐' },
+        { id: 'security', name: 'Security', icon: '🛡️' },
+        { id: 'management', name: 'Management & Governance', icon: '⚙️' },
+        { id: 'analytics', name: 'Analytics', icon: '📈' },
+        { id: 'app_integration', name: 'App Integration', icon: '🔗' },
+        { id: 'hybrid', name: 'Hybrid Cloud', icon: '🤝' }
+    ],
+    services: {
+        // Compute services
+        ec2: {
+            categoryId: 'compute',
+            name: 'Amazon EC2',
+            description: "Amazon EC2 delivers resizable computing capacity in the form of virtual servers, known as instances, hosted within Amazon's global data centers. It offers a diverse range of instance types and pricing models.",
+            resources: ["EC2 Instances (Virtual Servers)", "Amazon Machine Images (AMIs - templates)", "Elastic Block Store (EBS) Volumes", "Elastic Network Interfaces (ENIs)", "Key Pairs", "Security Groups", "Placement Groups"],
+            relationships: [
+                { serviceId: 'ebs', reason: "Provides foundational persistent block storage for EC2 instances (Zonal relationship). EBS snapshots are backed up to S3 (Regional relationship)." },
+                { serviceId: 'iam', reason: "IAM roles grant EC2 instances temporary, secure permissions to interact with other AWS services within an account or across accounts." },
+                { serviceId: 'vpc', reason: "EC2 instances are launched and operate within a VPC, leveraging its subnets (Zonal), security groups, and network ACLs for network isolation and traffic control." },
+                { serviceId: 'autoscaling', reason: "Amazon EC2 Auto Scaling automatically adjusts the number of EC2 instances in a fleet to meet demand (Regional)." },
+                { serviceId: 'cloudwatch', reason: "CloudWatch collects metrics (e.g., CPUUtilization, NetworkIn) from EC2 instances for monitoring and alarms." },
+                { serviceId: 'elb', reason: "Elastic Load Balancers distribute incoming application traffic across multiple EC2 instances (Regional or Zonal)." },
+                { serviceId: 'outposts', reason: "EC2 instances can be deployed on AWS Outposts for on-premises compute, extending the AWS Region VPC." },
+                { serviceId: 'systemsmanager', reason: "Systems Manager provides management capabilities for EC2 instances, including patch management, command execution, and session management." },
+                { serviceId: 'computeoptimizer', reason: "Provides EC2 instance type recommendations to optimize performance and cost." }
+            ]
+        },
+        lambda: {
+            categoryId: 'compute',
+            name: 'AWS Lambda',
+            description: "A serverless compute service that enables users to execute code without the need to provision or manage servers. Charges are incurred only for compute time consumed.",
+            resources: ["Lambda Functions (Code Units)", "Execution Roles (IAM)", "Event Sources (Triggers)", "Concurrency Settings", "Lambda Layers", "VPC Configuration (ENIs)"],
+            relationships: [
+                { serviceId: 'iam', reason: "Execution roles (IAM roles) define the function's permissions to access other services within an account or across accounts." },
+                { serviceId: 's3', reason: "S3 can serve as a direct event source, triggering Lambda functions upon object creation, modification, or deletion. Lambda can also process S3 objects." },
+                { serviceId: 'sqs', reason: "SQS queues commonly serve as event sources for Lambda, facilitating event-driven architectures and asynchronous processing." },
+                { serviceId: 'sns', reason: "SNS topics can trigger Lambda functions for fan-out messaging patterns." },
+                { serviceId: 'kinesis', reason: "Kinesis streams (Data Streams, Firehose) can trigger Lambda functions for real-time data processing." },
+                { serviceId: 'dynamodb', reason: "DynamoDB Streams can act as an event source, triggering Lambda functions in real-time in response to data changes." },
+                { serviceId: 'cloudwatch', reason: "Lambda functions automatically send their log events to CloudWatch Logs for centralized logging, monitoring, and troubleshooting." },
+                { serviceId: 'vpc', reason: "Can be configured to access resources inside your private VPC by creating Elastic Network Interfaces (ENIs) in subnets (Zonal)." },
+                { serviceId: 'apigateway', reason: "API Gateway can invoke Lambda functions to power serverless REST APIs." },
+                { serviceId: 'stepfunctions', reason: "AWS Step Functions can orchestrate complex workflows involving Lambda functions." },
+                { serviceId: 'secretsmanager', reason: "Lambda functions can retrieve secrets from Secrets Manager at runtime for secure access to databases or APIs." }
+            ]
+        },
+        autoscaling: {
+            categoryId: 'compute',
+            name: 'EC2 Auto Scaling',
+            description: "Automatically adjusts the number of EC2 instances in your application based on demand, enhancing reliability and performance efficiency.",
+            resources: ["Auto Scaling Groups (ASGs)", "Launch Configurations", "Launch Templates", "Scaling Policies"],
+            relationships: [
+                { serviceId: 'ec2', reason: "Manages the lifecycle and number of EC2 instances, deploying them across Availability Zones (Zonal)." },
+                { serviceId: 'elb', reason: "Integrates with Elastic Load Balancers to distribute traffic across scaled instances." },
+                { serviceId: 'cloudwatch', reason: "Uses CloudWatch Alarms to trigger scaling policies based on metrics (e.g., CPU utilization)." },
+                { serviceId: 'computeoptimizer', reason: "Provides recommendations for Auto Scaling group configurations." }
+            ]
+        },
+        batch: {
+            categoryId: 'compute',
+            name: 'AWS Batch',
+            description: "Enables developers, scientists, and engineers to easily run hundreds of thousands of batch computing jobs on AWS.",
+            resources: ["Compute Environments", "Job Queues", "Job Definitions", "Jobs"],
+            relationships: [
+                { serviceId: 'ecs', reason: "Leverages Amazon ECS to run containerized batch jobs." },
+                { serviceId: 'ec2', reason: "Can provision and manage EC2 instances (including Spot Instances) as compute resources." },
+                { serviceId: 's3', reason: "Often uses S3 for input data and output results." },
+                { serviceId: 'cloudwatch', reason: "Sends job metrics and logs to CloudWatch." },
+                { serviceId: 'iam', reason: "Uses IAM roles for job execution permissions." },
+                { serviceId: 'eventbridge', reason: "EventBridge can trigger AWS Batch jobs." }
+            ]
+        },
+
+        // Containers services
+        ecs: {
+            categoryId: 'containers',
+            name: 'Amazon ECS (Elastic Container Service)',
+            description: "A highly scalable, high-performance container orchestration service that supports Docker containers.",
+            resources: ["ECS Clusters", "Task Definitions", "ECS Services", "ECS Tasks", "Container Instances (EC2)", "Fargate Launch Type"],
+            relationships: [
+                { serviceId: 'ecr', reason: "Pulls container images from Amazon ECR (Regional)." },
+                { serviceId: 'elb', reason: "Integrates with Elastic Load Balancing to distribute traffic to ECS tasks." },
+                { serviceId: 'cloudwatch', reason: "Sends metrics and logs to CloudWatch for monitoring, autoscaling, and troubleshooting." },
+                { serviceId: 'iam', reason: "Uses IAM roles for task execution permissions and controlling access to other AWS services." },
+                { serviceId: 'vpc', reason: "Runs within a VPC for network isolation, leveraging subnets and security groups." },
+                { serviceId: 'outposts', reason: "Can run Amazon ECS on Outposts for hybrid deployments." },
+                { serviceId: 'appmesh', reason: "Can integrate with AWS App Mesh for service mesh capabilities." },
+                { serviceId: 'proton', reason: "AWS Proton can provision and manage ECS environments." },
+                { serviceId: 'efs', reason: "ECS tasks can mount EFS file systems for persistent storage." },
+                { serviceId: 'xray', reason: "Can send trace data to AWS X-Ray for distributed tracing." }
+            ]
+        },
+        eks: {
+            categoryId: 'containers',
+            name: 'Amazon EKS (Elastic Kubernetes Service)',
+            description: "A managed Kubernetes service that makes it easy to run Kubernetes on AWS without needing to operate your own Kubernetes control plane.",
+            resources: ["EKS Clusters (Control Plane)", "Worker Nodes (EC2, Fargate)", "Kubernetes Pods", "Deployments", "Services", "Ingress", "Persistent Volumes (EBS, EFS)"],
+            relationships: [
+                { serviceId: 'ecr', reason: "Pulls container images from Amazon ECR for Kubernetes Pods (Regional)." },
+                { serviceId: 'elb', reason: "Integrates with Elastic Load Balancing for Kubernetes services of type LoadBalancer." },
+                { serviceId: 'iam', reason: "Uses IAM for cluster roles, node roles, and EKS Pod Identity for fine-grained access to AWS resources (Account-level authorization)." },
+                { serviceId: 'vpc', reason: "EKS clusters and worker nodes run within a VPC for network isolation, leveraging subnets and security groups." },
+                { serviceId: 'cloudwatch', reason: "Sends control plane logs and worker node metrics to CloudWatch." },
+                { serviceId: 'outposts', reason: "Can run Amazon EKS clusters (extended or local) on AWS Outposts." },
+                { serviceId: 'appmesh', reason: "Can integrate with AWS App Mesh for service mesh capabilities." },
+                { serviceId: 'proton', reason: "AWS Proton can provision and manage EKS environments." },
+                { serviceId: 'efs', reason: "EKS Pods can use EFS for persistent volumes." },
+                { serviceId: 'ebs', reason: "EKS Pods can use EBS volumes for persistent volumes (Zonal)." },
+                { serviceId: 'xray', reason: "Can send trace data to AWS X-Ray for distributed tracing." }
+            ]
+        },
+        fargate: {
+            categoryId: 'containers',
+            name: 'AWS Fargate',
+            description: "A serverless compute engine for containers that works with both Amazon ECS and Amazon EKS. It removes the need to provision, configure, or scale virtual machines.",
+            resources: ["Tasks (for ECS)", "Pods (for EKS)"],
+            relationships: [
+                { serviceId: 'ecs', reason: "Enables running ECS tasks on a serverless infrastructure." },
+                { serviceId: 'eks', reason: "Enables running Kubernetes Pods on a serverless infrastructure." },
+                { serviceId: 'vpc', reason: "Pods/Tasks run in private subnets within your VPC, leveraging VPC networking (Zonal)." },
+                { serviceId: 'elb', reason: "Network Load Balancers and Application Load Balancers can be used with Fargate (IP targets only)." },
+                { serviceId: 'iam', reason: "Uses IAM roles for task execution permissions and controlling access to other AWS services." },
+                { serviceId: 'cloudwatch', reason: "Sends metrics and logs to CloudWatch." }
+            ]
+        },
+        ecr: {
+            categoryId: 'containers',
+            name: 'Amazon ECR (Elastic Container Registry)',
+            description: "A fully managed Docker container registry that makes it easy to store, manage, and deploy Docker container images.",
+            resources: ["Repositories", "Container Images", "Lifecycle Policies"],
+            relationships: [
+                { serviceId: 'ecs', reason: "ECS pulls container images from ECR for running tasks (Regional)." },
+                { serviceId: 'eks', reason: "EKS pulls container images from ECR for Kubernetes Pods (Regional)." },
+                { serviceId: 'lambda', reason: "Lambda functions can be deployed as container images stored in ECR." },
+                { serviceId: 'iam', reason: "Uses IAM for resource-based permissions to control access to repositories and images, supporting cross-account access." },
+                { serviceId: 'inspector', reason: "Integrates with Amazon Inspector for automatic vulnerability scanning of images." },
+                { serviceId: 'region', reason: "Supports cross-Region replication of container images." },
+                { serviceId: 'cross_account', reason: "Supports cross-account replication and pulling of container images via IAM policies." }
+            ]
+        },
+        appmesh: {
+            categoryId: 'containers',
+            name: 'AWS App Mesh',
+            description: "A service mesh that provides application-level networking to make it easy to run microservices. It standardizes how your microservices communicate.",
+            resources: ["Meshes", "Virtual Services", "Virtual Nodes", "Virtual Routers", "Routes"],
+            relationships: [
+                { serviceId: 'ecs', reason: "Can be used with Amazon ECS for microservices." },
+                { serviceId: 'eks', reason: "Can be used with Amazon EKS for microservices." },
+                { serviceId: 'ec2', reason: "Can be used with EC2 instances running microservices." },
+                { serviceId: 'cloudwatch', reason: "Generates metrics (e.g., total requests) and access logs for observability." },
+                { serviceId: 'xray', reason: "Can forward distributed traces to AWS X-Ray for debugging and performance analysis." }
+            ]
+        },
+
+        // Storage services
+        s3: {
+            categoryId: 'storage',
+            name: 'Amazon S3',
+            description: "An object storage service offering industry-leading scalability, data availability, security, and performance. It's used for a wide range of use cases such as websites, mobile applications, backup and restore, archive, and big data analytics.",
+            resources: ["S3 Buckets (General Purpose, Directory)", "S3 Objects", "Storage Classes (Standard, IA, Glacier, One Zone, Express)", "Versioning", "S3 Object Lock", "Access Control Policies (Bucket Policies, ACLs)", "S3 Access Points"],
+            relationships: [
+                { serviceId: 'iam', reason: "IAM policies and S3 bucket policies are the primary way to control access to S3 data, supporting cross-account access." },
+                { serviceId: 'lambda', reason: "Can trigger Lambda functions on object events (e.g., PUT, DELETE) for event-driven processing." },
+                { serviceId: 'cloudfront', reason: "Serves as a common origin for CloudFront to accelerate content delivery globally. S3 Transfer Acceleration leverages CloudFront's edge locations. S3 Multi-Region Access Points enhance cross-Region performance." },
+                { serviceId: 'glue', reason: "Forms the foundation of data lakes, storing raw data for ETL processing by Glue." },
+                { serviceId: 'athena', reason: "Athena can query data directly in S3 using standard SQL." },
+                { serviceId: 'redshift', reason: "Redshift can load data from S3 and Redshift Spectrum can query data directly in S3." },
+                { serviceId: 'quickSight', reason: "QuickSight uses S3 as a data source for business intelligence and visualization." },
+                { serviceId: 'config', reason: "Tracks S3 bucket configuration changes for compliance and auditing." },
+                { serviceId: 'cloudwatch', reason: "Provides one-minute CloudWatch request metrics for S3 buckets for monitoring storage usage and activity." },
+                { serviceId: 'macie', reason: "Amazon Macie discovers, classifies, and protects sensitive data stored in S3." },
+                { serviceId: 'kms', reason: "S3 objects can be encrypted at rest using AWS KMS keys (SSE-KMS)." },
+                { serviceId: 'vpc', reason: "VPC Gateway Endpoints allow private connectivity to S3 from within a VPC, bypassing the internet." },
+                { serviceId: 'cross_account', reason: "Supports cross-account and cross-Region replication of container images via IAM policies and S3 replication." }
+            ]
+        },
+        ebs: {
+            categoryId: 'storage',
+            name: 'Amazon EBS',
+            description: "Provides persistent block storage volumes for use with Amazon EC2 instances. It is designed for low-latency access and is suitable for workloads that require frequent reads/writes.",
+            resources: ["EBS Volumes", "EBS Snapshots (backups to S3)", "EBS Volume Types (gp2, gp3, io1, io2, sc1, st1)"],
+            relationships: [
+                { serviceId: 'ec2', reason: "The primary and most direct relationship; EBS provides storage for EC2 instances (Zonal relationship)." },
+                { serviceId: 's3', reason: "EBS snapshots are stored in S3, providing durable, cost-effective backups." },
+                { serviceId: 'kms', reason: "EBS volumes can be encrypted using keys managed by AWS KMS (Zonal encryption)." },
+                { serviceId: 'eks', reason: "EKS uses EBS CSI driver for dynamic provisioning of persistent volumes for Pods (Zonal)." },
+                { serviceId: 'computeoptimizer', reason: "Provides recommendations for EBS volume types and sizes." }
+            ]
+        },
+        s3glacier: {
+            categoryId: 'storage',
+            name: 'Amazon S3 Glacier',
+            description: "A highly cost-effective storage solution tailored for the long-term archival of infrequently accessed data, offering flexible retrieval options.",
+            resources: ["Vaults", "Archives"],
+            relationships: [
+                { serviceId: 's3', reason: "S3 lifecycle policies can automatically transition data from S3 Standard to Glacier for cost optimization." },
+                { serviceId: 'storagegateway', reason: "AWS Storage Gateway (Tape Gateway) integrates with S3 Glacier for virtual tape library backups." },
+                { serviceId: 'kms', reason: "Glacier vaults can be encrypted using KMS keys." }
+            ]
+        },
+        efs: {
+            categoryId: 'storage',
+            name: 'Amazon EFS (Elastic File System)',
+            description: "A scalable, elastic, cloud-native NFS file system that can be mounted by multiple EC2 instances concurrently.",
+            resources: ["EFS File Systems", "Mount Targets (ENIs in VPC subnets)", "Access Points"],
+            relationships: [
+                { serviceId: 'ec2', reason: "Multiple EC2 instances can concurrently mount and access the same EFS file system." },
+                { serviceId: 'lambda', reason: "Lambda functions can access EFS file systems for persistent storage (VPC access required)." },
+                { serviceId: 'ecs', reason: "ECS tasks can mount EFS file systems for shared persistent storage." },
+                { serviceId: 'eks', reason: "EKS Pods can use EFS for persistent volumes via EFS CSI driver." },
+                { serviceId: 'iam', reason: "IAM policies are used to control access to EFS file systems." },
+                { serviceId: 'vpc', reason: "EFS requires mount targets in VPC subnets (Zonal)." }
+            ]
+        },
+        fsx: {
+            categoryId: 'storage',
+            name: 'Amazon FSx',
+            description: "Fully managed third-party file systems (e.g., FSx for Windows File Server, Lustre, NetApp ONTAP, OpenZFS) for specific workloads.",
+            resources: ["File Systems (e.g., FSx for Windows File Server, FSx for Lustre)"],
+            relationships: [
+                { serviceId: 'vpc', reason: "Deployed within a VPC for network integration and accessible via ENIs." },
+                { serviceId: 'ec2', reason: "Mounted by EC2 instances as shared file storage." },
+                { serviceId: 'iam', reason: "Uses IAM for access control and integration with Active Directory (for Windows File Server)." },
+                { serviceId: 's3', reason: "FSx for Lustre can integrate with S3 for data repositories." }
+            ]
+        },
+        storagegateway: {
+            categoryId: 'storage',
+            name: 'AWS Storage Gateway',
+            description: "A hybrid cloud storage service that connects an on-premises software appliance with cloud-based storage.",
+            resources: ["Gateways (File, Volume, Tape)", "Volumes", "Virtual Tapes"],
+            relationships: [
+                { serviceId: 's3', reason: "File Gateway maps S3 buckets as network file shares. Volume Gateway stores virtual hard disk volumes in S3." },
+                { serviceId: 'ebs', reason: "Can use EBS for local caching of frequently accessed data." },
+                { serviceId: 's3glacier', reason: "Tape Gateway integrates with S3 Glacier for archival storage." },
+                { serviceId: 'on_premises', reason: "Deploys as a virtual appliance on-premises to connect to AWS cloud storage." }
+            ]
+        },
+
+        // Database services
+        rds: {
+            categoryId: 'database',
+            name: 'Amazon RDS',
+            description: "A managed relational database service that simplifies the setup, operation, and scaling of databases like MySQL, PostgreSQL, Oracle, and SQL Server.",
+            resources: ["DB Instances", "DB Engines", "DB Subnet Groups", "Multi-AZ Deployments", "Read Replicas", "DB Snapshots", "Parameter Groups", "Option Groups"],
+            relationships: [
+                { serviceId: 'ebs', reason: "Leverages EBS volumes for its underlying, high-performance storage (Zonal)." },
+                { serviceId: 'vpc', reason: "Instances are deployed within a VPC for network isolation and security, utilizing DB Subnet Groups across Availability Zones." },
+                { serviceId: 'lambda', reason: "Lambda functions can establish connections to RDS databases to perform operations (VPC access required)." },
+                { serviceId: 'cloudwatch', reason: "CloudWatch collects comprehensive metrics for RDS instances, enabling detailed monitoring and alarms." },
+                { serviceId: 's3', reason: "RDS supports exporting database snapshots to S3 for long-term archival. AWS offers zero-ETL integrations to Redshift, leveraging S3." },
+                { serviceId: 'redshift', reason: "AWS offers zero-ETL integrations to move transactional data from RDS to Amazon Redshift for near real-time analytics (Regional)." },
+                { serviceId: 'iam', reason: "IAM database authentication allows for managing database user access through IAM, centralizing access control." },
+                { serviceId: 'secretsmanager', reason: "AWS Secrets Manager can automatically rotate credentials for RDS databases, enhancing security." },
+                { serviceId: 'outposts', reason: "Can run Amazon RDS on AWS Outposts for on-premises deployments." }
+            ]
+        },
+        dynamodb: {
+            categoryId: 'database',
+            name: 'Amazon DynamoDB',
+            description: "A fast, flexible NoSQL database service for applications that need consistent, single-digit millisecond latency at any scale. It is a fully managed database and supports both document and key-value store models.",
+            resources: ["Tables", "Items", "Global Tables (Multi-Region replication)", "DynamoDB Streams", "DAX (DynamoDB Accelerator)"],
+            relationships: [
+                { serviceId: 'lambda', reason: "DynamoDB Streams can trigger Lambda functions in real-time on data changes, enabling event-driven processing." },
+                { serviceId: 'iam', reason: "IAM policies provide granular control over access to tables and data (Account-level authorization)." },
+                { serviceId: 'cloudwatch', reason: "Monitors key metrics like read/write capacity, enabling cost optimization and autoscaling." },
+                { serviceId: 's3', reason: "DynamoDB can export table data to S3 for analytics or backup." },
+                { serviceId: 'kinesis', reason: "DynamoDB Streams can be ingested by Kinesis for further processing." }
+            ]
+        },
+        aurora: {
+            categoryId: 'database',
+            name: 'Amazon Aurora',
+            description: "A MySQL and PostgreSQL-compatible relational database built for the cloud, offering high performance and availability.",
+            resources: ["Aurora Clusters", "Aurora DB Instances", "Aurora Global Database (Multi-Region replication)", "Serverless v1/v2"],
+            relationships: [
+                { serviceId: 'rds', reason: "Aurora is part of the Amazon RDS family, sharing many underlying concepts like DB Subnet Groups and Multi-AZ deployments." },
+                { serviceId: 'vpc', reason: "Deployed within a VPC for network isolation." },
+                { serviceId: 'cloudwatch', reason: "Monitors Aurora cluster and instance metrics." },
+                { serviceId: 'redshift', reason: "Supports zero-ETL integrations to Amazon Redshift for analytics (Regional)." },
+                { serviceId: 's3', reason: "Aurora can export audit logs and snapshots to S3." },
+                { serviceId: 'iam', reason: "IAM database authentication is supported." }
+            ]
+        },
+        redshift: {
+            categoryId: 'database',
+            name: 'Amazon Redshift',
+            description: "A fully managed, petabyte-scale data warehouse service for analytics.",
+            resources: ["Redshift Clusters", "Redshift Serverless", "Nodes"],
+            relationships: [
+                { serviceId: 's3', reason: "Redshift often loads data from S3, and Redshift Spectrum can query data directly in S3 data lakes." },
+                { serviceId: 'rds', reason: "Supports zero-ETL integrations from Amazon RDS for near real-time analytics (Regional)." },
+                { serviceId: 'glue', reason: "AWS Glue can prepare and load data into Redshift tables." },
+                { serviceId: 'quickSight', reason: "QuickSight integrates with Redshift for business intelligence and visualization." },
+                { serviceId: 'vpc', reason: "Deployed within a VPC for network isolation." },
+                { serviceId: 'iam', reason: "Uses IAM for access control to the data warehouse and integrated services." },
+                { serviceId: 'kinesis', reason: "Kinesis Firehose can directly deliver streaming data to Redshift." }
+            ]
+        },
+        elasticache: {
+            categoryId: 'database',
+            name: 'Amazon ElastiCache',
+            description: "A fully managed in-memory data store compatible with Redis and Memcached, for caching and real-time use cases.",
+            resources: ["Cache Clusters/Replication Groups", "Cache Nodes", "Cache Subnet Groups"],
+            relationships: [
+                { serviceId: 'ec2', reason: "Accessed by EC2 instances for caching application data." },
+                { serviceId: 'lambda', reason: "Lambda functions can connect to ElastiCache for caching (VPC access required)." },
+                { serviceId: 'vpc', reason: "Deployed within a VPC using a Cache Subnet Group (Zonal deployment)." },
+                { serviceId: 'cloudwatch', reason: "Monitors cache cluster metrics like CPU utilization and memory usage." },
+                { serviceId: 'iam', reason: "Uses IAM for authentication and authorization with Redis (Auth Tokens, IAM users)." }
+            ]
+        },
+
+        // Networking services
+        vpc: {
+            categoryId: 'networking',
+            name: 'Amazon VPC',
+            description: "Lets you provision a logically isolated section of the AWS Cloud where you can launch AWS resources in a virtual network that you define. You have complete control over your virtual networking environment.",
+            resources: ["VPC (network container)", "Subnets (public, private)", "Route Tables", "Internet Gateway (IGW)", "NAT Gateway", "VPC Endpoints (Gateway, Interface)", "Security Groups", "Network ACLs (NACLs)", "VPC Peering Connections", "Transit Gateway Attachments", "VPN Connections", "Direct Connect Gateways", "Egress-Only Internet Gateways", "VPC Flow Logs"],
+            relationships: [
+                { serviceId: 'ec2', reason: "Provides the foundational network for EC2 instances, deploying them into subnets (Zonal)." },
+                { serviceId: 'rds', reason: "Isolates RDS database instances within a private network, utilizing DB Subnet Groups (Zonal)." },
+                { serviceId: 'lambda', reason: "Allows Lambda functions to securely access resources within the VPC (via ENIs)." },
+                { serviceId: 'ecs', reason: "ECS tasks and services run within a VPC." },
+                { serviceId: 'eks', reason: "EKS clusters and worker nodes run within a VPC." },
+                { serviceId: 'securitygroup', reason: "Security Groups act as instance-level firewalls within the VPC (Zonal)." },
+                { serviceId: 'nacl', reason: "Network ACLs act as subnet-level firewalls within the VPC (Zonal)." },
+                { serviceId: 'cloudwatch', reason: "VPC Flow Logs can be sent to CloudWatch Logs or S3 for network traffic monitoring and analysis." },
+                { serviceId: 'iam', reason: "IAM policies control who can create, modify, and manage VPC resources (Account-level authorization)." },
+                { serviceId: 'directconnect', reason: "AWS Direct Connect establishes a dedicated network connection from on-premises to VPCs (Regional and cross-Region via Direct Connect Gateway)." },
+                { serviceId: 'site2sitevpn', reason: "AWS Site-to-Site VPN creates an encrypted connection between on-premises and VPCs (Regional)." },
+                { serviceId: 'transitgateway', reason: "AWS Transit Gateway connects multiple VPCs and on-premises networks centrally, simplifying routing (Regional and cross-Region)." },
+                { serviceId: 'outposts', reason: "Outposts connect to the AWS Region VPC to extend AWS services on-premises." },
+                { serviceId: 'ram', reason: "VPC subnets can be shared across AWS accounts using AWS Resource Access Manager (cross-account sharing)." },
+                { serviceId: 'organizations', reason: "VPC configurations can be governed and shared across accounts in an AWS Organization using Control Tower or custom solutions." }
+            ]
+        },
+        route53: {
+            categoryId: 'networking',
+            name: 'Amazon Route 53',
+            description: 'A highly available and scalable cloud Domain Name System (DNS) web service. It is designed to give developers and businesses an extremely reliable and cost-effective way to route end users to Internet applications.',
+            resources: ["Hosted Zones (Public, Private)", "Record Sets (A, CNAME, MX, TXT, etc.)", "Health Checks", "Traffic Policies"],
+            relationships: [
+                { serviceId: 'elb', reason: "Routes domain traffic to Elastic Load Balancers to distribute requests." },
+                { serviceId: 'cloudfront', reason: "Used with CloudFront to map custom domain names to distributions (Global)." },
+                { serviceId: 'ec2', reason: "Can point domains directly to the public IP addresses of EC2 instances." },
+                { serviceId: 'cloudwatch', reason: "Integrates with CloudWatch for health checks and DNS query logging." },
+                { serviceId: 's3', reason: "Can route traffic to S3 buckets configured for static website hosting." },
+                { serviceId: 'vpc', reason: "Private Hosted Zones integrate with VPCs for private DNS resolution." },
+                { serviceId: 'organizations', reason: "Private Hosted Zones can be associated with VPCs across accounts in an Organization." }
+            ]
+        },
+        elb: {
+            categoryId: 'networking',
+            name: 'Elastic Load Balancing (ELB)',
+            description: "Distributes incoming application traffic across multiple targets, such as EC2 instances, containers, and IP addresses, across multiple Availability Zones.",
+            resources: ["Application Load Balancer (ALB)", "Network Load Balancer (NLB)", "Gateway Load Balancer (GLB)", "Classic Load Balancer (CLB)", "Target Groups", "Listeners"],
+            relationships: [
+                { serviceId: 'ec2', reason: "Distributes traffic to EC2 instances (Zonal)." },
+                { serviceId: 'ecs', reason: "Distributes traffic to ECS tasks." },
+                { serviceId: 'eks', reason: "Distributes traffic to EKS Pods via Kubernetes services of type LoadBalancer." },
+                { serviceId: 'lambda', reason: "ALB can directly invoke Lambda functions as targets." },
+                { serviceId: 'vpc', reason: "Deployed within a VPC across multiple subnets/AZs (Zonal)." },
+                { serviceId: 'securitygroup', reason: "Associated with Security Groups to control traffic to and from the load balancer." },
+                { serviceId: 'route53', reason: "Route 53 can route DNS queries to ELBs for high availability." },
+                { serviceId: 'cloudwatch', reason: "Sends metrics (e.g., RequestCount, Latency) to CloudWatch for monitoring and autoscaling." },
+                { serviceId: 'waf', reason: "AWS WAF can protect ALBs from web exploits." },
+                { serviceId: 'globalaccelerator', reason: "AWS Global Accelerator can route traffic to ALBs or NLBs at the edge for global performance." }
+            ]
+        },
+        directconnect: {
+            categoryId: 'networking',
+            name: 'AWS Direct Connect',
+            description: "Establishes a dedicated network connection from your on-premises network to AWS, bypassing the public internet.",
+            resources: ["Direct Connect Connections", "Virtual Interfaces (VIFs - Private, Public, Transit)", "Direct Connect Gateway"],
+            relationships: [
+                { serviceId: 'vpc', reason: "Connects on-premises networks to VPCs (Regional and cross-Region via DX Gateway)." },
+                { serviceId: 'transitgateway', reason: "Can connect to AWS Transit Gateway for centralized routing to multiple VPCs (Regional and cross-Region)." },
+                { serviceId: 'outposts', reason: "Used to connect AWS Outposts to the AWS Region." },
+                { serviceId: 'on_premises', reason: "Provides private network connectivity from on-premises data centers." },
+                { serviceId: 'site2sitevpn', reason: "Can be used as the underlying network for a Site-to-Site VPN for additional encryption." }
+            ]
+        },
+        site2sitevpn: {
+            categoryId: 'networking',
+            name: 'AWS Site-to-Site VPN',
+            description: "Creates an encrypted connection between your on-premises network and your VPC over the public internet.",
+            resources: ["VPN Connections", "Customer Gateways (on-premises)", "Virtual Private Gateways (in VPC)"],
+            relationships: [
+                { serviceId: 'vpc', reason: "Connects on-premises networks to VPCs." },
+                { serviceId: 'transitgateway', reason: "Can connect to AWS Transit Gateway for centralized routing." },
+                { serviceId: 'on_premises', reason: "Provides encrypted network connectivity from on-premises data centers." }
+            ]
+        },
+        transitgateway: {
+            categoryId: 'networking',
+            name: 'AWS Transit Gateway',
+            description: "Connects VPCs and on-premises networks through a central hub, simplifying network management.",
+            resources: ["Transit Gateway", "Transit Gateway Attachments (VPC, VPN, Direct Connect)", "Transit Gateway Route Tables", "Multicast Domains"],
+            relationships: [
+                { serviceId: 'vpc', reason: "Connects multiple VPCs, enabling transitive routing (Regional and cross-Region)." },
+                { serviceId: 'directconnect', reason: "Integrates with AWS Direct Connect for hybrid connectivity." },
+                { serviceId: 'site2sitevpn', reason: "Integrates with AWS Site-to-Site VPN for hybrid connectivity." },
+                { serviceId: 'ram', reason: "Can be shared across AWS accounts using AWS Resource Access Manager (cross-account sharing)." },
+                { serviceId: 'organizations', reason: "Facilitates centralized network management across accounts in an AWS Organization." }
+            ]
+        },
+        securitygroup: {
+            categoryId: 'networking',
+            name: 'Security Groups',
+            description: "Acts as a virtual firewall for your EC2 instances and other resources to control inbound and outbound traffic at the instance level.",
+            resources: ["Security Group Rules (Inbound/Outbound)"],
+            relationships: [
+                { serviceId: 'vpc', reason: "Associated with resources within a VPC (Zonal)." },
+                { serviceId: 'ec2', reason: "Associated with EC2 instances." },
+                { serviceId: 'elb', reason: "Associated with Elastic Load Balancers." },
+                { serviceId: 'rds', reason: "Associated with RDS instances." },
+                { serviceId: 'lambda', reason: "Associated with Lambda ENIs when accessing VPC resources." },
+                { serviceId: 'nacl', reason: "Works in conjunction with Network ACLs for layered security." },
+                { serviceId: 'organizations', reason: "Can be shared across accounts within an AWS Organization." }
+            ]
+        },
+        nacl: {
+            categoryId: 'networking',
+            name: 'Network ACLs (NACLs)',
+            description: "An optional layer of security for your VPC that acts as a stateless firewall for controlling traffic in and out of one or more subnets.",
+            resources: ["NACL Rules (Inbound/Outbound)"],
+            relationships: [
+                { serviceId: 'vpc', reason: "Associated with subnets within a VPC (Zonal)." },
+                { serviceId: 'securitygroup', reason: "Works in conjunction with Security Groups for layered security." },
+                { serviceId: 'cloudwatch', reason: "VPC Flow Logs provide visibility into traffic filtered by NACLs." },
+                { serviceId: 'shield', reason: "Explicit deny rules in NACLs are effective for DDoS mitigation, especially with AWS Shield Advanced (Global)." }
+            ]
+        },
+        cloudfront: {
+            categoryId: 'networking',
+            name: 'Amazon CloudFront',
+            description: "A fast content delivery network (CDN) service that securely delivers data, videos, applications, and APIs to customers globally.",
+            resources: ["Distributions", "Origins", "Cache Behaviors", "Edge Locations (Points of Presence)"],
+            relationships: [
+                { serviceId: 's3', reason: "Serves as a common origin for CloudFront distributions (Regional S3 bucket, Global CloudFront)." },
+                { serviceId: 'elb', reason: "Can use an ALB as an origin for dynamic content." },
+                { serviceId: 'route53', reason: "Route 53 is used to map custom domain names to CloudFront distributions." },
+                { serviceId: 'waf', reason: "AWS WAF can protect CloudFront distributions from web exploits." },
+                { serviceId: 'acm', reason: "Uses AWS Certificate Manager for SSL/TLS certificates (Global for CloudFront)." },
+                { serviceId: 'lambda', reason: "Lambda@Edge allows running Lambda functions at CloudFront edge locations for content customization." }
+            ]
+        },
+        globalaccelerator: {
+            categoryId: 'networking',
+            name: 'AWS Global Accelerator',
+            description: "A networking service that improves the availability and performance of your applications by directing traffic to optimal AWS endpoints globally.",
+            resources: ["Accelerators", "Listeners", "Endpoint Groups", "Endpoints (ALBs, NLBs, EC2 EIPs)"],
+            relationships: [
+                { serviceId: 'elb', reason: "Routes traffic to ALBs and NLBs (Regional endpoints, Global accelerator)." },
+                { serviceId: 'ec2', reason: "Can route traffic to EC2 instances via Elastic IP addresses." },
+                { serviceId: 'route53', reason: "Integrates with Route 53 for DNS resolution." },
+                { serviceId: 'global', reason: "Operates at the AWS global network edge to optimize user experience." }
+            ]
+        },
+
+        // Security services
+        iam: {
+            categoryId: 'security',
+            name: 'AWS IAM',
+            description: "Enables you to securely manage access to AWS services and resources. You can create and manage AWS users, groups, and roles, and to define precise permissions using policies.",
+            resources: ["IAM Users", "IAM Groups", "IAM Roles (with Trust Policies)", "IAM Policies (Identity-based, Resource-based, Permissions Boundaries)", "Access Keys", "MFA Devices", "Identity Providers"],
+            relationships: [
+                { serviceId: 'AllServices', reason: "The fundamental security layer governing access to every AWS service and resource (Global scope, applied per-account/per-resource)." },
+                { serviceId: 'ec2', reason: "EC2 instances assume IAM Roles to get temporary permissions to other AWS services." },
+                { serviceId: 'lambda', reason: "Lambda functions use Execution Roles (IAM roles) to interact with other services." },
+                { serviceId: 's3', reason: "IAM policies, along with S3 bucket policies (Resource-based), control access to S3 data. Supports cross-account access." },
+                { serviceId: 'kms', reason: "IAM policies control who can manage and use encryption keys." },
+                { serviceId: 'cloudtrail', reason: "CloudTrail logs all actions taken by IAM principals for auditing (Global trail can aggregate across accounts)." },
+                { serviceId: 'organizations', reason: "Service Control Policies (SCPs) in AWS Organizations use IAM syntax to set maximum permissions across accounts/OUs (Organizational scope)." },
+                { serviceId: 'cross_account', reason: "IAM roles and resource-based policies are primary mechanisms for delegating secure cross-account access (Account-level authorization)." },
+                { serviceId: 'eks', reason: "EKS uses IAM for cluster roles, node roles, and EKS Pod Identity for fine-grained access to AWS resources." },
+                { serviceId: 'ecr', reason: "ECR uses IAM for resource-based permissions to control access to repositories." },
+                { serviceId: 'secretsmanager', reason: "IAM policies control access to Secrets Manager secrets." }
+            ]
+        },
+        kms: {
+            categoryId: 'security',
+            name: 'AWS KMS (Key Management Service)',
+            description: 'A managed service that makes it easy for you to create and control the cryptographic keys used to encrypt your data. It is integrated with many other AWS services to make data protection simple.',
+            resources: ["Customer Master Keys (CMKs)", "AWS Managed Keys", "Key Policies"],
+            relationships: [
+                { serviceId: 's3', reason: "Encrypts S3 objects at rest using server-side encryption (SSE-KMS) (Regional)." },
+                { serviceId: 'ebs', reason: "Encrypts EBS volumes attached to EC2 instances (Zonal)." },
+                { serviceId: 'rds', reason: "Encrypts data at rest for relational databases (Regional)." },
+                { serviceId: 'lambda', reason: "Lambda can leverage KMS for environment variable encryption." },
+                { serviceId: 'iam', reason: "IAM policies define who has permission to manage and use the keys (Account-level authorization)." },
+                { serviceId: 'secretsmanager', reason: "Secrets Manager uses KMS to encrypt secrets at rest." },
+                { serviceId: 'cross_account', reason: "KMS keys can be shared across accounts for encryption/decryption operations." }
+            ]
+        },
+        secretsmanager: {
+            categoryId: 'security',
+            name: 'AWS Secrets Manager',
+            description: "Helps you protect secrets needed to access your applications, services, and IT resources by securely storing and rotating credentials.",
+            resources: ["Secrets (credentials, API keys)", "Secret Rotation Configuration"],
+            relationships: [
+                { serviceId: 'lambda', reason: "Lambda functions can retrieve secrets at runtime for secure access to databases or APIs." },
+                { serviceId: 'rds', reason: "Can automatically rotate credentials for RDS databases." },
+                { serviceId: 'iam', reason: "IAM policies control access to Secrets Manager secrets." },
+                { serviceId: 'kms', reason: "Secrets Manager uses KMS to encrypt secrets at rest." }
+            ]
+        },
+        guardduty: {
+            categoryId: 'security',
+            name: 'Amazon GuardDuty',
+            description: "A threat detection service that continuously monitors for malicious activity and unauthorized behavior to protect AWS accounts and workloads.",
+            resources: ["Findings (Security Insights)", "Detectors"],
+            relationships: [
+                { serviceId: 'vpc', reason: "Analyzes VPC Flow Logs for unusual network traffic (Regional)." },
+                { serviceId: 's3', reason: "Monitors S3 data events for suspicious access patterns." },
+                { serviceId: 'cloudwatch', reason: "Publishes findings to CloudWatch Events/EventBridge for alerting and automation." },
+                { serviceId: 'cloudtrail', reason: "Monitors AWS CloudTrail management events for suspicious API activity." },
+                { serviceId: 'eks', reason: "Monitors EKS audit logs for suspicious Kubernetes activity." },
+                { serviceId: 'organizations', reason: "Can be centrally enabled and managed across accounts in an AWS Organization." }
+            ]
+        },
+        shield: {
+            categoryId: 'security',
+            name: 'AWS Shield',
+            description: "A managed Distributed Denial of Service (DDoS) protection service that safeguards applications running on AWS.",
+            resources: ["Shield Standard (automatic)", "Shield Advanced (subscription)", "Protections", "Custom Mitigations"],
+            relationships: [
+                { serviceId: 'cloudfront', reason: "Protects CloudFront distributions (Global service)." },
+                { serviceId: 'route53', reason: "Protects Route 53 hosted zones." },
+                { serviceId: 'elb', reason: "Protects Elastic Load Balancers (ALB, NLB)." },
+                { serviceId: 'ec2', reason: "Protects EC2 instances (via Elastic IP addresses)." },
+                { serviceId: 'nacl', reason: "With Shield Advanced, NACL rules can be enforced at the AWS network border for protected Elastic IPs (Global edge)." }
+            ]
+        },
+        waf: {
+            categoryId: 'security',
+            name: 'AWS WAF (Web Application Firewall)',
+            description: "Helps protect your web applications or APIs from common web exploits that could affect availability, compromise security, or consume excessive resources.",
+            resources: ["Web ACLs", "Rules", "Rule Groups (Managed and Custom)"],
+            relationships: [
+                { serviceId: 'cloudfront', reason: "Protects Amazon CloudFront distributions (Global)." },
+                { serviceId: 'apigateway', reason: "Protects Amazon API Gateway APIs (Regional)." },
+                { serviceId: 'elb', reason: "Protects Application Load Balancers (ALBs) (Regional)." },
+                { serviceId: 'cloudwatch', reason: "Publishes metrics and logs to CloudWatch for monitoring and analysis." }
+            ]
+        },
+        macie: {
+            categoryId: 'security',
+            name: 'Amazon Macie',
+            description: "An AI-powered security service that automatically discovers, classifies, and protects sensitive data stored in Amazon S3.",
+            resources: ["Sensitive Data Discovery Jobs", "Findings"],
+            relationships: [
+                { serviceId: 's3', reason: "Monitors S3 buckets and objects for sensitive data (Regional)." },
+                { serviceId: 'cloudwatch', reason: "Publishes findings to CloudWatch Events/EventBridge." },
+                { serviceId: 'iam', reason: "Uses IAM for permissions to access S3 buckets for scanning." },
+                { serviceId: 'organizations', reason: "Can be centrally enabled and managed across accounts in an AWS Organization." }
+            ]
+        },
+        inspector: {
+            categoryId: 'security',
+            name: 'Amazon Inspector',
+            description: "An automated security assessment service that helps improve the security and compliance of applications deployed on AWS.",
+            resources: ["Findings", "Assessment Templates", "Targets"],
+            relationships: [
+                { serviceId: 'ec2', reason: "Performs automated security assessments for EC2 instances (Regional)." },
+                { serviceId: 'ecr', reason: "Scans container images stored in Amazon ECR for vulnerabilities." },
+                { serviceId: 'lambda', reason: "Scans Lambda functions for vulnerabilities." },
+                { serviceId: 'ssm', reason: "Leverages the SSM Agent on EC2 instances for data collection." },
+                { serviceId: 'cloudwatch', reason: "Publishes findings to CloudWatch Events/EventBridge." }
+            ]
+        },
+
+        // Management & Governance services
+        cloudwatch: {
+            categoryId: 'management',
+            name: 'Amazon CloudWatch',
+            description: "A comprehensive monitoring and observability service that systematically collects and tracks metrics, gathers and monitors log files, and enables the setting of alarms on AWS resources and applications.",
+            resources: ["Metrics", "Logs (Log Groups, Log Streams, Log Insights)", "Alarms", "Dashboards", "Events/EventBridge Rules"],
+            relationships: [
+                { serviceId: 'AllServices', reason: "Collects metrics and logs from nearly every AWS service (Regional and cross-Region aggregation)."},
+                { serviceId: 'ec2', reason: "Monitors EC2 performance (CPU, Disk, Network) and can trigger alarms." },
+                { serviceId: 'lambda', reason: "Automatically collects logs and performance metrics from functions." },
+                { serviceId: 'autoscaling', reason: "Alarms are a primary trigger for Auto Scaling actions to scale in or out." },
+                { serviceId: 'cloudtrail', reason: "Can receive CloudTrail logs for real-time monitoring and alerting on API activity." },
+                { serviceId: 'vpc', reason: "VPC Flow Logs can be sent to CloudWatch Logs or S3 for network traffic analysis." },
+                { serviceId: 's3', reason: "Provides request metrics for S3 buckets." },
+                { serviceId: 'rds', reason: "Monitors RDS instance performance." },
+                { serviceId: 'dynamodb', reason: "Monitors DynamoDB capacity and performance." },
+                { serviceId: 'ecs', reason: "Monitors ECS service and task utilization." },
+                { serviceId: 'eks', reason: "Monitors EKS control plane logs and worker node metrics." },
+                { serviceId: 'sns', reason: "Alarms can send notifications via SNS." },
+                { serviceId: 'sqs', reason: "Events can be sent to SQS queues." },
+                { serviceId: 'xray', reason: "Integrates with X-Ray for tracing insights." },
+                { serviceId: 'organizations', reason: "Can aggregate monitoring data from multiple accounts in an AWS Organization." }
+            ]
+        },
+        cloudtrail: {
+            categoryId: 'management',
+            name: 'AWS CloudTrail',
+            description: "A service that enables governance, compliance, operational auditing, and risk auditing by logging, continuously monitoring, and retaining account activity related to actions performed across AWS services.",
+            resources: ["Trails (Regional, Organizational)", "Event History (Management Events, Data Events, Insights Events)", "Event Data Stores"],
+            relationships: [
+                { serviceId: 'AllServices', reason: "Logs API calls made to virtually all AWS services, providing a comprehensive audit trail (Global, Regional, and cross-account)." },
+                { serviceId: 's3', reason: "CloudTrail logs are typically stored in S3 buckets for durable and secure archival." },
+                { serviceId: 'cloudwatch', reason: "CloudTrail logs can be configured to be sent to CloudWatch Logs for real-time monitoring, alerting, and analysis." },
+                { serviceId: 'iam', reason: "Records all actions taken by IAM users, groups, and roles, which is critical for security analysis and compliance auditing." },
+                { serviceId: 'organizations', reason: "Can be configured for organizational trails to aggregate logs from all accounts in an AWS Organization." },
+                { serviceId: 'cross_account', reason: "Supports sharing log files between multiple AWS accounts for centralized auditing." }
+            ]
+        },
+        config: {
+            categoryId: 'management',
+            name: 'AWS Config',
+            description: "Continuously monitors and records AWS resource configurations, enabling automated evaluation of recorded configurations against desired configurations.",
+            resources: ["Config Rules (AWS Managed, Custom)", "Configuration Recorders", "Delivery Channels", "Conformance Packs", "Aggregators"],
+            relationships: [
+                { serviceId: 'AllResources', reason: "Tracks configurations and changes for a broad spectrum of resource types (Regional scope, can aggregate across Regions/Accounts)." },
+                { serviceId: 's3', reason: "Configuration snapshots and historical data recorded by AWS Config are stored in S3 for long-term retention." },
+                { serviceId: 'sns', reason: "Can be configured to send notifications for configuration changes via Amazon SNS." },
+                { serviceId: 'lambda', reason: "Custom AWS Config Rules can leverage Lambda functions to evaluate resource compliance and trigger remediation actions." },
+                { serviceId: 'cloudtrail', reason: "AWS Config works in conjunction with CloudTrail; Config focuses on the *state* of resources and their changes, while CloudTrail focuses on the API *actions* that trigger those state changes." },
+                { serviceId: 'organizations', reason: "Supports multi-account, multi-Region data aggregation for centralized compliance monitoring across an AWS Organization." }
+            ]
+        },
+        systemsmanager: {
+            categoryId: 'management',
+            name: 'AWS Systems Manager (SSM)',
+            description: "Provides a unified interface to view operational data from multiple AWS services and automate operational tasks across AWS resources.",
+            resources: ["SSM Agent", "Documents (Run Command, Automation)", "Parameter Store", "Maintenance Windows", "Patch Baselines", "Session Manager", "Explorer", "OpsCenter", "Distributor"],
+            relationships: [
+                { serviceId: 'ec2', reason: "Manages EC2 instances (e.g., running commands, patching, secure shell access) (Regional)." },
+                { serviceId: 'on_premises', reason: "Can manage on-premises servers and virtual machines via the SSM Agent." },
+                { serviceId: 'cloudwatch', reason: "Integrates with CloudWatch for monitoring and logging of automation and command execution." },
+                { serviceId: 'iam', reason: "Uses IAM for permissions to perform management actions and control access to SSM resources." },
+                { serviceId: 'secretsmanager', reason: "Parameter Store can store secrets, integrating with Secrets Manager for centralized secret management." },
+                { serviceId: 'organizations', reason: "Can be used to manage resources across multiple accounts in an AWS Organization." }
+            ]
+        },
+        servicecatalog: {
+            categoryId: 'management',
+            name: 'AWS Service Catalog',
+            description: "Empowers organizations to create and manage catalogs of IT services that are approved for use on AWS, enabling self-service provisioning for end-users.",
+            resources: ["Portfolios", "Products (CloudFormation templates)", "Provisioned Products", "Constraints"],
+            relationships: [
+                { serviceId: 'cloudformation', reason: "Products in Service Catalog are typically defined by CloudFormation templates, which provision AWS resources." },
+                { serviceId: 'iam', reason: "Administrators manage portfolios and grant access to end-users through IAM roles and constraints." },
+                { serviceId: 'organizations', reason: "Enables sharing and governance of products across multiple AWS accounts within an AWS Organization." },
+                { serviceId: 'cloudwatch', reason: "Provides monitoring metrics and logs for Service Catalog activities." },
+                { serviceId: 'cloudtrail', reason: "Logs Service Catalog API calls for auditing." }
+            ]
+        },
+        organizations: {
+            categoryId: 'management',
+            name: 'AWS Organizations',
+            description: "Centrally manages and governs your environment as you grow and scale your AWS resources, allowing you to consolidate multiple AWS accounts into an organization.",
+            resources: ["Organization (Root)", "Organizational Units (OUs)", "AWS Accounts", "Service Control Policies (SCPs)", "Consolidated Billing"],
+            relationships: [
+                { serviceId: 'iam', reason: "Service Control Policies (SCPs) use IAM syntax to define maximum permissions for accounts/OUs (Global scope)." },
+                { serviceId: 'cloudtrail', reason: "Can configure organizational trails to aggregate logs from all accounts in an AWS Organization." },
+                { serviceId: 'config', reason: "Supports multi-account, multi-Region data aggregation for compliance monitoring across an Organization." },
+                { serviceId: 'servicecatalog', reason: "Enables sharing of IT service catalogs across accounts." },
+                { serviceId: 'ram', reason: "Integrates with AWS Resource Access Manager to share resources across accounts within an Organization." },
+                { serviceId: 'controltower', reason: "AWS Control Tower provides a managed landing zone built on AWS Organizations for multi-account setup." },
+                { serviceId: 'cross_account', reason: "Facilitates centralized billing and management for multiple AWS accounts." }
+            ]
+        },
+        ram: {
+            categoryId: 'management',
+            name: 'AWS Resource Access Manager (RAM)',
+            description: "Securely shares your AWS resources with any AWS account or within your AWS Organization.",
+            resources: ["Resource Shares"],
+            relationships: [
+                { serviceId: 'vpc', reason: "Can share VPC subnets and Transit Gateways across accounts." },
+                { serviceId: 'transitgateway', reason: "Can share Transit Gateways across accounts for centralized networking." },
+                { serviceId: 'ami', reason: "Can share AMIs (Amazon Machine Images) with specific AWS accounts or OUs." },
+                { serviceId: 'organizations', reason: "Simplifies sharing within an AWS Organization for managed access." },
+                { serviceId: 'iam', reason: "Uses IAM for permissions to manage resource shares and define principals that can access shared resources." }
+            ]
+        },
+        cloudformation: {
+            categoryId: 'management',
+            name: 'AWS CloudFormation',
+            description: "Infrastructure as Code service for provisioning AWS resources, allowing you to model, provision, and manage AWS and third-party resources.",
+            resources: ["CloudFormation Stacks", "CloudFormation Templates (JSON/YAML)", "CloudFormation StackSets", "Change Sets"],
+            relationships: [
+                { serviceId: 'servicecatalog', reason: "Products in Service Catalog are typically defined by CloudFormation templates." },
+                { serviceId: 'organizations', reason: "CloudFormation StackSets can deploy stacks across multiple accounts and Regions within an AWS Organization (Organizational scope)." },
+                { serviceId: 'iam', reason: "Uses IAM roles for permissions to create and manage resources in a stack (Account-level authorization)." },
+                { serviceId: 'cloudwatch', reason: "Logs events and metrics related to stack operations." },
+                { serviceId: 'cloudtrail', reason: "Logs API calls made by CloudFormation for auditing." }
+            ]
+        },
+        controltower: {
+            categoryId: 'management',
+            name: 'AWS Control Tower',
+            description: "Provides an easy way to set up and govern a secure, multi-account AWS environment, based on best practices.",
+            resources: ["Landing Zone", "Guardrails", "Account Factory"],
+            relationships: [
+                { serviceId: 'organizations', reason: "Built on AWS Organizations to create and manage multiple AWS accounts and OUs." },
+                { serviceId: 'iam', reason: "Deploys pre-configured IAM roles and policies for governance." },
+                { serviceId: 'cloudtrail', reason: "Sets up centralized CloudTrail logging for all accounts." },
+                { serviceId: 'config', reason: "Configures AWS Config for continuous compliance monitoring across accounts." },
+                { serviceId: 'sso', reason: "Integrates with AWS IAM Identity Center (SSO) for centralized access management." }
+            ]
+        },
+        xray: {
+            categoryId: 'management',
+            name: 'AWS X-Ray',
+            description: "Helps developers analyze and debug distributed applications built in the cloud, providing end-to-end view of requests.",
+            resources: ["Traces", "Segments", "Service Map"],
+            relationships: [
+                { serviceId: 'lambda', reason: "Enables distributed tracing for Lambda functions." },
+                { serviceId: 'ec2', reason: "Enables tracing for applications running on EC2." },
+                { serviceId: 'ecs', reason: "Enables tracing for containerized applications on ECS." },
+                { serviceId: 'eks', reason: "Enables tracing for containerized applications on EKS." },
+                { serviceId: 'apigateway', reason: "Integrates with API Gateway to trace requests." },
+                { serviceId: 'elb', reason: "Integrates with ELB to trace requests." },
+                { serviceId: 'cloudwatch', reason: "Sends trace data to CloudWatch Logs and metrics to CloudWatch." }
+            ]
+        },
+        computeoptimizer: {
+            categoryId: 'management',
+            name: 'AWS Compute Optimizer',
+            description: "Recommends optimal AWS resources for your workloads to reduce costs and improve performance.",
+            resources: ["Recommendations (EC2, EBS, Auto Scaling, Lambda, ECS Fargate)"],
+            relationships: [
+                { serviceId: 'ec2', reason: "Provides recommendations for EC2 instance types." },
+                { serviceId: 'ebs', reason: "Provides recommendations for EBS volume types and sizes." },
+                { serviceId: 'autoscaling', reason: "Provides recommendations for EC2 Auto Scaling group configurations." },
+                { serviceId: 'lambda', reason: "Provides recommendations for Lambda function memory and power configurations." },
+                { serviceId: 'ecs', reason: "Provides recommendations for ECS Service and Fargate task configurations." },
+                { serviceId: 'cloudwatch', reason: "Uses CloudWatch metrics to generate recommendations." }
+            ]
+        },
+        budgets: {
+            categoryId: 'management',
+            name: 'AWS Budgets',
+            description: "Allows you to set custom budgets to track your cost and usage from the simplest to the most complex use cases.",
+            resources: ["Budgets", "Alerts (Cost, Usage, RI, Savings Plan)"],
+            relationships: [
+                { serviceId: 'costexplorer', reason: "Works with Cost Explorer to analyze costs and usage." },
+                { serviceId: 'sns', reason: "Can send notifications via SNS when budget thresholds are exceeded." },
+                { serviceId: 'organizations', reason: "Can apply budgets across multiple accounts in an AWS Organization." }
+            ]
+        },
+        costexplorer: {
+            categoryId: 'management',
+            name: 'AWS Cost Explorer',
+            description: "A tool that enables you to visualize, understand, and manage your AWS costs and usage over time.",
+            resources: ["Cost and Usage Reports", "Forecasts"],
+            relationships: [
+                { serviceId: 'budgets', reason: "Used by AWS Budgets to track and alert on cost thresholds." },
+                { serviceId: 'organizations', reason: "Provides consolidated cost reporting for all accounts in an AWS Organization." }
+            ]
+        },
+        proton: {
+            categoryId: 'management',
+            name: 'AWS Proton',
+            description: "A fully managed deployment service for container and serverless applications.",
+            resources: ["Environments", "Services", "Templates (Environment, Service)"],
+            relationships: [
+                { serviceId: 'ecs', reason: "Provisions and manages ECS environments and services." },
+                { serviceId: 'eks', reason: "Provisions and manages EKS environments and services." },
+                { serviceId: 'lambda', reason: "Provisions and manages serverless applications using Lambda." },
+                { serviceId: 'cloudformation', reason: "Uses CloudFormation templates for provisioning infrastructure." },
+                { serviceId: 'codepipeline', reason: "Integrates with CodePipeline for CI/CD." },
+                { serviceId: 'organizations', reason: "Can be used to standardize deployments across accounts in an Organization." }
+            ]
+        },
+
+        // Analytics services
+        kinesis: {
+            categoryId: 'analytics',
+            name: 'Amazon Kinesis',
+            description: "A platform for streaming data, enabling real-time processing of large streams of data.",
+            resources: ["Kinesis Data Streams", "Kinesis Firehose (Delivery Streams)", "Kinesis Data Analytics (SQL, Flink)", "Kinesis Video Streams"],
+            relationships: [
+                { serviceId: 's3', reason: "Kinesis Firehose can deliver streaming data to S3 for storage in a data lake." },
+                { serviceId: 'redshift', reason: "Kinesis Firehose can deliver streaming data to Redshift for real-time analytics." },
+                { serviceId: 'dynamodb', reason: "Can ingest data from DynamoDB Streams." },
+                { serviceId: 'emr', reason: "Amazon EMR can process data from Kinesis streams." },
+                { serviceId: 'lambda', reason: "Kinesis Data Streams can trigger Lambda functions for real-time processing." },
+                { serviceId: 'cloudwatch', reason: "Monitors Kinesis stream metrics." }
+            ]
+        },
+        glue: {
+            categoryId: 'analytics',
+            name: 'AWS Glue',
+            description: "A serverless data integration service for ETL (Extract, Transform, and Load) operations, making it easy to prepare data for analytics and machine learning.",
+            resources: ["Glue Data Catalog (Databases, Tables, Partitions)", "Glue Crawlers", "Glue Jobs (Spark, Python Shell)", "Glue Workflows", "Glue DataBrew", "Glue Data Quality"],
+            relationships: [
+                { serviceId: 's3', reason: "Can extract, transform, and load data from/to S3 data lakes." },
+                { serviceId: 'rds', reason: "Can extract data from various relational databases in RDS." },
+                { serviceId: 'dynamodb', reason: "Can extract data from DynamoDB tables." },
+                { serviceId: 'athena', reason: "Athena uses the AWS Glue Data Catalog for metadata to query data in S3." },
+                { serviceId: 'redshift', reason: "Can prepare and load data into Amazon Redshift." },
+                { serviceId: 'emr', reason: "Integrates with Amazon EMR for large-scale data processing, using Glue Data Catalog." },
+                { serviceId: 'iam', reason: "Uses IAM roles for permissions to access data sources and targets." },
+                { serviceId: 'cloudwatch', reason: "Sends metrics and logs to CloudWatch for monitoring Glue jobs." }
+            ]
+        },
+athena: {
+            categoryId: 'analytics',
+            name: 'Amazon Athena',
+            description: "An interactive query service that makes it easy to analyze data directly in Amazon S3 using standard SQL.",
+            resources: ["Workgroups", "Named Queries", "Query Results (stored in S3)"],
+            relationships: [
+                { serviceId: 's3', reason: "Queries data directly in S3 buckets." },
+                { serviceId: 'glue', reason: "Uses the AWS Glue Data Catalog for metadata and schema information." },
+                { serviceId: 'quickSight', reason: "QuickSight can use Athena as a data source for visualizations." },
+                { serviceId: 'cloudwatch', reason: "Sends query metrics to CloudWatch." },
+                { serviceId: 'iam', reason: "Uses IAM for access control to S3 and Glue Data Catalog." }
+            ]
+        },
+        emr: {
+            categoryId: 'analytics',
+            name: 'Amazon EMR (Elastic MapReduce)',
+            description: "A fully managed cloud big data platform for running large-scale distributed data processing frameworks like Apache Spark, Hadoop, Hive, and Presto.",
+            resources: ["EMR Clusters", "Nodes (Master, Core, Task)", "EMR Notebooks"],
+            relationships: [
+                { serviceId: 'ec2', reason: "Runs on EC2 instances for compute capacity." },
+                { serviceId: 's3', reason: "Often uses S3 for input and output data storage." },
+                { serviceId: 'kinesis', reason: "Can process streaming data from Kinesis." },
+                { serviceId: 'glue', reason: "Integrates with AWS Glue Data Catalog for metadata management." },
+                { serviceId: 'cloudwatch', reason: "Sends cluster metrics to CloudWatch." },
+                { serviceId: 'iam', reason: "Uses IAM roles for cluster and application permissions." }
+            ]
+        },
+        quickSight: {
+            categoryId: 'analytics',
+            name: 'Amazon QuickSight',
+            description: "A scalable, serverless, cloud-powered business intelligence (BI) service that makes it easy to create and publish interactive dashboards.",
+            resources: ["Dashboards", "Analyses", "Datasets", "SPICE Capacity"],
+            relationships: [
+                { serviceId: 'redshift', reason: "Connects to Amazon Redshift for data warehousing." },
+                { serviceId: 'athena', reason: "Connects to Amazon Athena for querying S3 data." },
+                { serviceId: 'rds', reason: "Connects to various relational databases in RDS." },
+                { serviceId: 'dynamodb', reason: "Can connect to DynamoDB for data." },
+                { serviceId: 's3', reason: "Can use S3 as a direct data source." },
+                { serviceId: 'iam', reason: "Uses IAM for data source access control." }
+            ]
+        },
+
+        // Application Integration services
+        sqs: {
+            categoryId: 'app_integration',
+            name: 'Amazon SQS (Simple Queue Service)',
+            description: "A fully managed message queuing service that enables you to decouple and scale microservices, distributed systems, and serverless applications.",
+            resources: ["Standard Queues", "FIFO Queues", "Dead-Letter Queues"],
+            relationships: [
+                { serviceId: 'lambda', reason: "Lambda functions can poll SQS queues as an event source." },
+                { serviceId: 'sns', reason: "SNS topics can send messages to SQS queues for fan-out messaging." },
+                { serviceId: 'ec2', reason: "Applications running on EC2 instances can send and receive messages from SQS." },
+                { serviceId: 'iam', reason: "IAM policies control access to SQS queues. Supports cross-account access via resource policies." },
+                { serviceId: 'apigateway', reason: "API Gateway can send messages directly to SQS queues." },
+                { serviceId: 'eventbridge', reason: "EventBridge can send events to SQS queues as targets." },
+                { serviceId: 'cross_account', reason: "Supports cross-account access via resource-based policies." }
+            ]
+        },
+        sns: {
+            categoryId: 'app_integration',
+            name: 'Amazon SNS (Simple Notification Service)',
+            description: "A fully managed pub/sub messaging service that enables you to send messages to a large number of subscribers.",
+            resources: ["SNS Topics", "Subscriptions (HTTP/S, Lambda, SQS, Email, SMS)"],
+            relationships: [
+                { serviceId: 'lambda', reason: "SNS topics can trigger Lambda functions." },
+                { serviceId: 'cloudwatch', reason: "CloudWatch Alarms can send notifications to SNS topics." },
+                { serviceId: 's3', reason: "S3 events can publish notifications to SNS topics." },
+                { serviceId: 'sqs', reason: "SNS topics can send messages to SQS queues." },
+                { serviceId: 'iam', reason: "IAM policies control access to SNS topics. Supports cross-account access via resource policies." },
+                { serviceId: 'eventbridge', reason: "EventBridge can send events to SNS topics as targets." },
+                { serviceId: 'cross_account', reason: "Supports cross-account access via resource-based policies." }
+            ]
+        },
+        apigateway: {
+            categoryId: 'app_integration',
+            name: 'Amazon API Gateway',
+            description: "A fully managed service that makes it easy for developers to create, publish, maintain, monitor, and secure APIs at any scale.",
+            resources: ["REST APIs", "HTTP APIs", "WebSocket APIs", "API Endpoints", "Methods", "Integrations", "Stages", "Authorizers (Lambda, Cognito, IAM)"],
+            relationships: [
+                { serviceId: 'lambda', reason: "Commonly integrates with Lambda functions as backend for serverless APIs." },
+                { serviceId: 'ec2', reason: "Can integrate with EC2 instances (via ELB) as backend." },
+                { serviceId: 'stepfunctions', reason: "Can integrate with AWS Step Functions for complex workflows." },
+                { serviceId: 'waf', reason: "AWS WAF can protect API Gateway APIs from web exploits." },
+                { serviceId: 'iam', reason: "Uses IAM for API authorization and access control (IAM Authorizers)." },
+                { serviceId: 'cloudwatch', reason: "Sends metrics and logs to CloudWatch for monitoring." },
+                { serviceId: 's3', reason: "Can serve static content from S3 (HTTP Proxy integration)." },
+                { serviceId: 'sqs', reason: "Can send messages directly to SQS queues." },
+                { serviceId: 'xray', reason: "Integrates with X-Ray for tracing API requests." }
+            ]
+        },
+        stepfunctions: {
+            categoryId: 'app_integration',
+            name: 'AWS Step Functions',
+            description: "A serverless workflow service that lets you combine AWS Lambda functions and other AWS services to build business-critical applications.",
+            resources: ["State Machines", "Task States", "Choice States", "Parallel States", "Map States", "Executions"],
+            relationships: [
+                { serviceId: 'lambda', reason: "Orchestrates workflows involving Lambda functions." },
+                { serviceId: 'ecs', reason: "Can orchestrate ECS tasks." },
+                { serviceId: 'ec2', reason: "Can orchestrate actions on EC2 instances." },
+                { serviceId: 'apigateway', reason: "Can be integrated with API Gateway to trigger workflows." },
+                { serviceId: 'iam', reason: "Uses IAM roles for permissions to execute workflow steps and interact with integrated services." },
+                { serviceId: 'cloudwatch', reason: "Sends metrics and logs to CloudWatch for monitoring workflow execution." },
+                { serviceId: 'dynamodb', reason: "Can interact with DynamoDB for data persistence within workflows." },
+                { serviceId: 's3', reason: "Can interact with S3 for data handling within workflows." }
+            ]
+        },
+        eventbridge: {
+            categoryId: 'app_integration',
+            name: 'Amazon EventBridge',
+            description: "A serverless event bus that makes it easier to connect applications together using data from your own applications, integrated SaaS applications, and AWS services.",
+            resources: ["Event Buses (Default, Custom, Partner)", "Rules", "Targets"],
+            relationships: [
+                { serviceId: 'lambda', reason: "Can trigger Lambda functions based on events." },
+                { serviceId: 'sqs', reason: "Can send events to SQS queues." },
+                { serviceId: 'sns', reason: "Can send events to SNS topics." },
+                { serviceId: 'ecs', reason: "Can trigger ECS tasks." },
+                { serviceId: 'batch', reason: "Can trigger AWS Batch jobs." },
+                { serviceId: 'cloudwatch', reason: "Evolved from CloudWatch Events, providing enhanced event routing." },
+                { serviceId: 'AllServices', reason: "Receives events from over 200 AWS services." },
+                { serviceId: 'stepfunctions', reason: "Can trigger Step Functions state machines." },
+                { serviceId: 'cross_account', reason: "Supports cross-account event routing via event buses." }
+            ]
+        },
+
+        // Hybrid Cloud services
+        outposts: {
+            categoryId: 'hybrid',
+            name: 'AWS Outposts',
+            description: "Extends AWS infrastructure, services, APIs, and tools to customer on-premises facilities, providing a truly consistent hybrid experience.",
+            resources: ["Outpost Rack", "Outpost Capacity (EC2, EBS, S3 on Outposts)"],
+            relationships: [
+                { serviceId: 'ec2', reason: "Can run EC2 instances on-premises." },
+                { serviceId: 'ecs', reason: "Can run Amazon ECS on Outposts." },
+                { serviceId: 'eks', reason: "Can run Amazon EKS clusters (extended or local) on-premises." },
+                { serviceId: 'rds', reason: "Can run Amazon RDS on Outposts." },
+                { serviceId: 'vpc', reason: "Connects to the AWS Region VPC via a Direct Connect or VPN connection." },
+                { serviceId: 's3', reason: "Can use S3 on Outposts for local object storage." },
+                { serviceId: 'directconnect', reason: "Often uses Direct Connect for connectivity to the AWS Region." },
+                { serviceId: 'on_premises', reason: "Integrates with on-premises networks and data centers." }
+            ]
+        },
+
+        // Global concepts / meta-services for relationships
+        AllServices: { name: 'All AWS Services' },
+        AllResources: { name: 'All AWS Resources' },
+        cross_account: { name: 'Cross-Account Access' },
+        on_premises: { name: 'On-Premises Resources' },
+        region: { name: 'AWS Region' },
+        availability_zone: { name: 'Availability Zone' },
+        global: { name: 'Global Service' },
+        organizations_meta: { name: 'AWS Organization Hierarchy' },
+        ami: { name: 'Amazon Machine Image' },
+        acm: { name: 'AWS Certificate Manager' },
+        sso: { name: 'AWS IAM Identity Center (SSO)' }
+    },
+    patterns: {
+        microservices: {
+            name: "Microservices",
+            description: "This pattern decomposes a large application into smaller, independent services. Each service handles a specific business function and communicates via APIs, allowing for independent scaling and development.",
+            diagram: [
+                { serviceId: 'route53', label: 'DNS Routing' },
+                { serviceId: 'elb', label: 'Traffic Routing' },
+                [
+                    { serviceId: 'ec2', label: 'Service A (EC2/ASG)' },
+                    { serviceId: 'lambda', label: 'Service B (Lambda)' },
+                    { serviceId: 'ecs', label: 'Service C (Containers)' },
+                    { serviceId: 'eks', label: 'Service D (Kubernetes)' }
+                ],
+                { serviceId: 'apigateway', label: 'API Gateway (Internal/External)' },
+                [
+                    { serviceId: 'rds', label: 'DB for Service A' },
+                    { serviceId: 'dynamodb', label: 'DB for Service B' },
+                    { serviceId: 's3', label: 'Storage for Service C' }
+                ],
+                { serviceId: 'ecr', label: 'Container Image Registry' },
+                { serviceId: 'appmesh', label: 'Service Mesh (Optional)' },
+                { serviceId: 'cloudwatch', label: 'Monitoring & Logs' },
+                { serviceId: 'xray', label: 'Distributed Tracing' }
+            ]
+        },
+        eventDriven: {
+            name: "Event-Driven Architecture",
+            description: "In this pattern, services communicate by producing and consuming events. This decoupling enhances scalability and fault tolerance, as services can operate independently and asynchronously.",
+            diagram: [
+                [
+                    { serviceId: 's3', label: 'Event Source (e.g., Upload)' },
+                    { serviceId: 'apigateway', label: 'Event Source (e.g., API Call)' },
+                    { serviceId: 'sqs', label: 'Event Source (e.g., Message)' }
+                ],
+                { serviceId: 'eventbridge', label: 'Event Bus / Router' },
+                [
+                    { serviceId: 'lambda', label: 'Event Consumer (Processing Logic)' },
+                    { serviceId: 'sqs', label: 'Message Queue (Decoupling)' },
+                    { serviceId: 'sns', label: 'Notification Topic (Fan-out)' }
+                ],
+                { serviceId: 'stepfunctions', label: 'Workflow Orchestration' },
+                [
+                    { serviceId: 'dynamodb', label: 'Data Store (Results)' },
+                    { serviceId: 's3', label: 'Data Lake (Processed Data)' }
+                ]
+            ]
+        },
+        dataPipeline: {
+            name: "Data Processing Pipeline",
+            description: "This architecture is specifically designed to ingest, transform, and analyze large volumes of data, often operating in a batch or streaming fashion to derive business insights.",
+            diagram: [
+                [
+                    { serviceId: 'kinesis', label: 'Data Ingestion (Streaming)' },
+                    { serviceId: 'sqs', label: 'Data Ingestion (Queuing)' },
+                    { serviceId: 'directconnect', label: 'On-Prem Data Ingestion' }
+                ],
+                { serviceId: 's3', label: 'Data Lake Storage (Raw/Processed)' },
+                { serviceId: 'glue', label: 'ETL / Transformation' },
+                [
+                    { serviceId: 'emr', label: 'Big Data Processing' },
+                    { serviceId: 'athena', label: 'Interactive Querying' }
+                ],
+                { serviceId: 'redshift', label: 'Data Warehouse' },
+                { serviceId: 'quickSight', label: 'BI & Visualization' },
+                { serviceId: 'cloudwatch', label: 'Monitoring & Logging' }
+            ]
+        },
+        batchJobs: {
+            name: "Batch Jobs",
+            description: "This pattern processes large volumes of data at scheduled times, ideal for tasks like payroll processing, report generation, and bulk data handling.",
+            diagram: [
+                { serviceId: 's3', label: 'Input/Output Data' },
+                { serviceId: 'batch', label: 'Batch Job Orchestration' },
+                [
+                    { serviceId: 'ecs', label: 'Containerized Compute' },
+                    { serviceId: 'ec2', label: 'VM Compute' }
+                ],
+                { serviceId: 'cloudwatch', label: 'Monitoring & Logs' },
+                { serviceId: 'sqs', label: 'Job Queue (Optional)' }
+            ]
+        }
+    },
+    concepts: {
+        security: {
+            title: "Security Groups vs. Network ACLs (NACLs)",
+            description: "Both are virtual firewalls for your VPC, but they operate at different levels and have different characteristics, forming a layered security approach.",
+            comparison: [
+                { feature: 'Control Level', sg: 'Instance level (applies to ENIs)', nacl: 'Subnet level (applies to all instances in subnet)' },
+                { feature: 'Stateful/Stateless', sg: 'Stateful (return traffic automatically allowed)', nacl: 'Stateless (explicit rules required for both inbound and outbound traffic, including return traffic)' },
+                { feature: 'Rule Types', sg: 'Allow rules only', nacl: 'Allow and Deny rules' },
+                { feature: 'Default Behavior', sg: 'Implicitly denies all traffic unless explicitly allowed', nacl: 'Default NACL allows all; custom NACLs implicitly deny if no allow rule matches' },
+                { feature: 'Rule Evaluation Order', sg: 'All rules evaluated; order doesn\'t matter', nacl: 'Rules evaluated in ascending order by rule number; first matching rule applies' },
+                { feature: 'Primary Use Case', sg: 'Instance-specific traffic filtering, application-layer security', nacl: 'Subnet-level traffic filtering, explicit deny rules, DDoS mitigation at subnet/edge' }
+            ]
+        },
+        iam: {
+            title: "Identity-based vs. Resource-based Policies",
+            description: "IAM uses policies to grant permissions. Understanding the two main types is critical for effective access control, especially across different AWS accounts and services.",
+            comparison: [
+                { feature: 'Attachment Point', sg: 'Attached to IAM identities (users, groups, roles)', nacl: 'Attached directly to a resource (e.g., S3 bucket, Lambda function, SQS queue)' },
+                { feature: 'Defines Permissions For', sg: 'What the identity *can do*', nacl: 'Who *can access* the resource' },
+                { feature: 'Use Cases', sg: 'Defining user permissions, service roles (e.g., Lambda execution role), federated access (assuming roles)', nacl: 'Granting cross-account access to a specific resource, allowing AWS services to interact with a resource (e.g., S3 Event Notifications)' },
+                { feature: 'Cross-Account Mechanism', sg: 'Principal assumes an IAM role in the target account (Identity-based policy allows assumption in source account, Resource-based policy on role allows target account\'s principal)', nacl: 'Resource policy directly grants access to principals in other accounts without role assumption' },
+                { feature: 'Common Services', sg: 'All AWS services (via IAM roles), EC2, Lambda, API Gateway', nacl: 'Amazon S3, Amazon SQS, Amazon SNS, AWS KMS, AWS Lambda (for function policies), Amazon EventBridge' }
+            ]
+        },
+        org_boundaries: {
+            title: "AWS Account vs. Organizational Unit (OU) vs. Organization",
+            description: "Understanding these hierarchical boundaries is crucial for scalable governance, security, and billing in AWS.",
+            comparison: [
+                { feature: 'Definition', sg: 'A single, isolated AWS environment where resources are provisioned.', nacl: 'A logical grouping of AWS accounts within an Organization.', org: 'A collection of AWS accounts that you can centrally manage.' },
+                { feature: 'Primary Function', sg: 'Resource isolation, billing boundary, security principal boundary.', nacl: 'Simplifies management and governance of accounts with similar needs.', org: 'Centralized management, consolidated billing, service control policies (SCPs).' },
+                { feature: 'Security Control', sg: 'IAM policies define permissions *within* the account.', nacl: 'SCPs applied to an OU affect all accounts *within* that OU.', org: 'SCPs applied at the root affect all accounts *in the Organization*.' },
+                { feature: 'Billing', sg: 'Individual billing.', nacl: 'Part of consolidated billing under the Organization\'s management account.', org: 'Consolidated billing across all member accounts.' },
+                { feature: 'Key Services', sg: 'VPC, EC2, S3, RDS, Lambda, IAM.', nacl: 'AWS Organizations, AWS Control Tower (for OU-level guardrails).', org: 'AWS Organizations, AWS Control Tower, CloudTrail (Organizational Trails), Config (Multi-Account Aggregation).' }
+            ]
+        }
+    },
+    framework: {
+        operational_excellence: { name: "Operational Excellence", icon: "🚀", description: "Running and monitoring systems to deliver business value and continuously improve processes and procedures, with focus on automation, consistent deployments, and observability.", services: ['cloudwatch', 'cloudtrail', 'config', 'systemsmanager', 'servicecatalog', 'cloudformation', 'eventbridge', 'xray', 'proton', 'organizations'] },
+        security: { name: "Security", icon: "🛡️", description: "Protecting information, systems, and assets while delivering business value through risk assessments and mitigation strategies, adhering to the shared responsibility model and principle of least privilege.", services: ['iam', 'kms', 'secretsmanager', 'guardduty', 'shield', 'waf', 'macie', 'inspector', 'vpc', 'securitygroup', 'nacl', 'cloudtrail', 'config', 'organizations', 'controltower'] },
+        reliability: { name: "Reliability", icon: "💪", description: "Ensuring that a workload consistently performs its intended function, encompassing the ability to dynamically scale resources to meet demand, effectively mitigate disruptions, and rapidly recover from failures.", services: ['autoscaling', 'elb', 'rds', 's3', 'dynamodb', 'route53', 'lambda', 'cloudformation', 'transitgateway', 'directconnect', 'site2sitevpn', 'ecs', 'eks', 'outposts', 'eventbridge', 'controltower'] },
+        performance_efficiency: { name: "Performance Efficiency", icon: "⚡", description: "Utilizing computing resources efficiently to deliver sustained performance as demand and technologies evolve, focusing on optimal resource selection, horizontal scaling, and latency reduction.", services: ['ec2', 'lambda', 'autoscaling', 'elb', 's3', 'dynamodb', 'elasticache', 'cloudfront', 'kinesis', 'emr', 'redshift', 'apigateway', 'ecs', 'eks', 'globalaccelerator', 'computeoptimizer', 'xray'] },
+        cost_optimization: { name: "Cost Optimization", icon: "💰", description: "Running systems to deliver business value at the lowest possible price point, including avoiding unnecessary costs, analyzing expenditure, and optimizing resource provisioning.", services: ['lambda', 's3', 'dynamodb', 'autoscaling', 'ec2', 'rds', 'athena', 'glue', 'organizations', 'costexplorer', 'budgets', 'computeoptimizer', 'fargate', 's3glacier', 'spot'] },
+        sustainability: { name: "Sustainability", icon: "🌿", description: "Minimizing the environmental impacts of running workloads in the cloud, focusing on efficient resource utilization, serverless adoption, and optimization of data storage and transfer.", services: ['lambda', 'autoscaling', 's3', 'rds', 'ec2', 'computeoptimizer', 'fargate', 's3glacier', 'organizations'] },
+    }
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    const mainNav = document.getElementById('main-nav');
+    const views = document.querySelectorAll('.view');
+    const categorySelector = document.getElementById('category-selector');
+    const serviceSelectorContainer = document.getElementById('service-selector-container');
+    const serviceSelector = document.getElementById('service-selector');
+    const serviceDetailContainer = document.getElementById('service-detail-container');
+    const patternsContainer = document.getElementById('patterns-container');
+    const conceptDisplay = document.getElementById('concept-display');
+    const conceptBtns = document.querySelectorAll('.concept-btn');
+    const frameworkPillarsContainer = document.getElementById('framework-pillars');
+    const frameworkDetailContainer = document.getElementById('framework-detail');
+    let relationshipChart = null;
+
+    function switchView(viewId) {
+        views.forEach(view => view.classList.remove('active'));
+        document.getElementById(`${viewId}-view`).classList.add('active');
+        
+        mainNav.querySelectorAll('.nav-link').forEach(link => {
+            if (link.dataset.view === viewId) {
+                link.classList.add('bg-teal-50', 'text-teal-700');
+                link.classList.remove('text-gray-600', 'hover:bg-gray-100', 'hover:text-gray-900');
+            } else {
+                link.classList.remove('bg-teal-50', 'text-teal-700');
+                link.classList.add('text-gray-600', 'hover:bg-gray-100', 'hover:text-gray-900');
+            }
+        });
+    }
+
+    function populateCategories() {
+        categorySelector.innerHTML = awsData.categories.map(cat => `
+            <button data-category-id="${cat.id}" class="category-btn bg-white hover:bg-amber-100 text-gray-800 font-semibold py-3 px-4 rounded-lg shadow transition-transform transform hover:scale-105 flex items-center justify-center flex-col">
+                <span class="text-3xl mb-2">${cat.icon}</span>
+                <span>${cat.name}</span>
+            </button>
+        `).join('');
+    }
+    
+    function populateServices(categoryId) {
+        const servicesForCategory = Object.entries(awsData.services)
+           .filter(([id, service]) => service.categoryId === categoryId);
+        
+        serviceSelector.innerHTML = servicesForCategory.map(([id, service]) => `
+             <button data-service-id="${id}" class="service-btn bg-teal-500 hover:bg-teal-600 text-white font-medium py-2 px-4 rounded-full transition-shadow shadow hover:shadow-lg">
+                ${service.name}
+            </button>
+        `).join('');
+        serviceSelectorContainer.classList.remove('hidden');
+    }
+    
+    function displayServiceDetails(serviceId) {
+        const service = awsData.services[serviceId];
+        if (!service) return;
+
+        const relationshipHTML = service.relationships.map(rel => {
+            const relService = awsData.services[rel.serviceId];
+            if (!relService) return '';
+            const serviceName = relService.name || rel.serviceId.charAt(0).toUpperCase() + rel.serviceId.slice(1).replace(/_/g, ' ');
+            return `<li class="flex items-start"><span class="text-teal-500 mr-2 mt-1">➔</span> <span><strong>${serviceName}:</strong> ${rel.reason}</span></li>`;
+        }).join('');
+
+        const resourceHTML = service.resources.map(res => `<li>${res}</li>`).join('');
+
+        serviceDetailContainer.innerHTML = `
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                <div class="prose-custom">
+                    <h3 class="text-3xl font-bold text-gray-900">${service.name}</h3>
+                    <p class="text-gray-600 mt-2">${service.description}</p>
+                    <h4 class="text-xl font-semibold mt-6 mb-2">Key Resources:</h4>
+                    <ul class="text-gray-600 space-y-1">${resourceHTML}</ul>
+                    <h4 class="text-xl font-semibold mt-6 mb-2">Core Relationships:</h4>
+                    <ul class="text-gray-600 space-y-2">${relationshipHTML}</ul>
+                </div>
+                <div>
+                    <h4 class="text-xl font-semibold text-center mb-4">Service Interconnectivity Web</h4>
+                    <div class="chart-container">
+                        <canvas id="relationshipChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        `;
+        serviceDetailContainer.classList.remove('hidden');
+        renderRelationshipChart(serviceId);
+        serviceDetailContainer.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function renderRelationshipChart(serviceId) {
+        const service = awsData.services[serviceId];
+        const ctx = document.getElementById('relationshipChart').getContext('2d');
+
+        if (relationshipChart) {
+            relationshipChart.destroy();
+        }
+
+        const labels = service.relationships.map(rel => {
+            const relService = awsData.services[rel.serviceId];
+            const name = relService ? relService.name : rel.serviceId.charAt(0).toUpperCase() + rel.serviceId.slice(1).replace(/_/g, ' ');
+            // Wrap long labels for better display in polar area chart
+            return name.length > 16 ? name.match(/.{1,16}/g) : name;
+        });
+        const data = service.relationships.map(() => 10); // Equal weight for visualization
+
+        const backgroundColors = [
+            'rgba(13, 148, 136, 0.5)', 'rgba(245, 158, 11, 0.5)', 'rgba(59, 130, 246, 0.5)',
+            'rgba(239, 68, 68, 0.5)', 'rgba(139, 92, 246, 0.5)', 'rgba(217, 70, 239, 0.5)',
+            'rgba(74, 222, 128, 0.5)', 'rgba(251, 191, 36, 0.5)', 'rgba(129, 140, 248, 0.5)',
+            'rgba(244, 114, 182, 0.5)', 'rgba(163, 230, 53, 0.5)', 'rgba(168, 85, 247, 0.5)',
+            'rgba(234, 179, 8, 0.5)', 'rgba(6, 182, 212, 0.5)', 'rgba(192, 38, 211, 0.5)',
+            'rgba(253, 224, 71, 0.5)', 'rgba(100, 116, 139, 0.5)'
+        ];
+        const borderColors = [
+            'rgba(13, 148, 136, 1)', 'rgba(245, 158, 11, 1)', 'rgba(59, 130, 246, 1)',
+            'rgba(239, 68, 68, 1)', 'rgba(139, 92, 246, 1)', 'rgba(217, 70, 239, 1)',
+            'rgba(74, 222, 128, 1)', 'rgba(251, 191, 36, 1)', 'rgba(129, 140, 248, 1)',
+            'rgba(244, 114, 182, 1)', 'rgba(163, 230, 53, 1)', 'rgba(168, 85, 247, 1)',
+            'rgba(234, 179, 8, 1)', 'rgba(6, 182, 212, 1)', 'rgba(192, 38, 211, 1)',
+            'rgba(253, 224, 71, 1)', 'rgba(100, 116, 139, 1)'
+        ];
+
+
+        relationshipChart = new Chart(ctx, {
+            type: 'polarArea',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Related Services',
+                    data: data,
+                    backgroundColor: backgroundColors.slice(0, labels.length),
+                    borderColor: borderColors.slice(0, labels.length),
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        display: false
+                    }
+                },
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const rel = service.relationships[context.dataIndex];
+                                return rel.reason;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function populatePatterns() {
+        patternsContainer.innerHTML = Object.values(awsData.patterns).map(pattern => {
+            const diagramHTML = pattern.diagram.map(level => {
+                if (Array.isArray(level)) {
+                    const servicesHTML = level.map(item => `
+                        <div data-service-id="${item.serviceId}" class="service-btn-link bg-white border border-gray-300 rounded-lg p-3 text-center shadow-sm cursor-pointer hover:bg-amber-100 hover:shadow-md transition">
+                            <p class="font-semibold text-gray-800">${awsData.services[item.serviceId]?.name || item.serviceId.charAt(0).toUpperCase() + item.serviceId.slice(1).replace(/_/g, ' ')}</p>
+                            <p class="text-xs text-gray-500">${item.label}</p>
+                        </div>
+                    `).join('');
+                    return `<div class="flex flex-wrap justify-center gap-4">${servicesHTML}</div>`;
+                } else {
+                    return `
+                        <div class="flex items-center justify-center my-4">
+                            <div class="diagram-arrow"></div>
+                        </div>
+                        <div class="flex justify-center">
+                            <div data-service-id="${level.serviceId}" class="service-btn-link bg-white border border-gray-300 rounded-lg p-3 text-center shadow-sm cursor-pointer hover:bg-amber-100 hover:shadow-md transition w-full max-w-xs">
+                                <p class="font-semibold text-gray-800">${awsData.services[level.serviceId]?.name || level.serviceId.charAt(0).toUpperCase() + level.serviceId.slice(1).replace(/_/g, ' ')}</p>
+                                <p class="text-xs text-gray-500">${level.label}</p>
+                            </div>
+                        </div>
+                    `;
+                }
+            }).join('');
+
+            return `
+                <div class="pattern-card bg-white p-6 rounded-lg shadow-lg">
+                    <h3 class="text-2xl font-bold text-gray-900 mb-2">${pattern.name}</h3>
+                    <p class="text-gray-600 mb-6">${pattern.description}</p>
+                    <div class="bg-gray-50 p-4 rounded-md border border-gray-200">${diagramHTML}</div>
+                </div>
+            `;
+        }).join('');
+    }
+    
+    function displayConcept(conceptId) {
+        const concept = awsData.concepts[conceptId];
+        let tableHeaders = '';
+        let tableRows = '';
+
+        if (conceptId === 'org_boundaries') {
+            tableHeaders = `
+                <tr>
+                    <th scope="col" class="py-3 px-4">Feature</th>
+                    <th scope="col" class="py-3 px-4">AWS Account</th>
+                    <th scope="col" class="py-3 px-4">Organizational Unit (OU)</th>
+                    <th scope="col" class="py-3 px-4">Organization</th>
+                </tr>
+            `;
+            tableRows = concept.comparison.map(row => `
+                <tr class="border-b border-gray-200">
+                    <td class="py-3 px-4 font-semibold text-gray-700">${row.feature}</td>
+                    <td class="py-3 px-4 text-gray-600">${row.sg}</td>
+                    <td class="py-3 px-4 text-gray-600">${row.nacl}</td>
+                    <td class="py-3 px-4 text-gray-600">${row.org}</td>
+                </tr>
+            `).join('');
+        } else {
+            tableHeaders = `
+                <tr>
+                    <th scope="col" class="py-3 px-4">Feature</th>
+                    <th scope="col" class="py-3 px-4">${conceptId === 'security' ? 'Security Group' : 'Identity-based Policy'}</th>
+                    <th scope="col" class="py-3 px-4">${conceptId === 'security' ? 'Network ACL' : 'Resource-based Policy'}</th>
+                </tr>
+            `;
+            tableRows = concept.comparison.map(row => `
+                <tr class="border-b border-gray-200">
+                    <td class="py-3 px-4 font-semibold text-gray-700">${row.feature}</td>
+                    <td class="py-3 px-4 text-gray-600">${row.sg}</td>
+                    <td class="py-3 px-4 text-gray-600">${row.nacl}</td>
+                </tr>
+            `).join('');
+        }
+
+        conceptDisplay.innerHTML = `
+            <h3 class="text-2xl font-bold text-gray-900 mb-2">${concept.title}</h3>
+            <p class="text-gray-600 mb-6">${concept.description}</p>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm text-left">
+                    <thead class="text-xs text-gray-700 uppercase bg-gray-100">
+                        ${tableHeaders}
+                    </thead>
+                    <tbody>${tableRows}</tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    function populateFramework() {
+        frameworkPillarsContainer.innerHTML = Object.entries(awsData.framework).map(([id, pillar]) => `
+            <div data-pillar-id="${id}" class="framework-pillar-card bg-white p-6 rounded-lg shadow cursor-pointer hover:shadow-xl hover:scale-105 transition-all duration-300">
+                <div class="flex items-center mb-3">
+                    <span class="text-3xl mr-4">${pillar.icon}</span>
+                    <h4 class="text-xl font-bold text-gray-900">${pillar.name}</h4>
+                </div>
+                <p class="text-gray-600">${pillar.description}</p>
+            </div>
+        `).join('');
+    }
+
+    function displayFrameworkDetail(pillarId) {
+        const pillar = awsData.framework[pillarId];
+        const servicesHTML = pillar.services.map(serviceId => {
+            const service = awsData.services[serviceId];
+            return `<li data-service-id="${serviceId}" class="service-btn-link inline-block bg-teal-100 text-teal-800 text-sm font-medium mr-2 mb-2 px-3 py-1 rounded-full cursor-pointer hover:bg-teal-200">${service.name || serviceId.charAt(0).toUpperCase() + serviceId.slice(1).replace(/_/g, ' ')}</li>`;
+        }).join('');
+        
+        frameworkDetailContainer.innerHTML = `
+            <div class="flex items-center mb-4">
+                 <span class="text-4xl mr-4">${pillar.icon}</span>
+                 <h3 class="text-3xl font-bold text-gray-900">${pillar.name}</h3>
+            </div>
+            <p class="text-lg text-gray-600 mb-6">${pillar.description}</p>
+            <h4 class="text-xl font-semibold mb-3">Key Contributing Services:</h4>
+            <ul>${servicesHTML}</ul>
+        `;
+        frameworkDetailContainer.classList.remove('hidden');
+        frameworkDetailContainer.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // Event Listeners
+    mainNav.addEventListener('click', (e) => {
+        if (e.target.matches('.nav-link')) {
+            switchView(e.target.dataset.view);
+        }
+    });
+
+    categorySelector.addEventListener('click', (e) => {
+        const button = e.target.closest('.category-btn');
+        if (button) {
+            populateServices(button.dataset.categoryId);
+            serviceDetailContainer.classList.add('hidden');
+        }
+    });
+
+    serviceSelector.addEventListener('click', (e) => {
+        if (e.target.matches('.service-btn')) {
+            displayServiceDetails(e.target.dataset.serviceId);
+        }
+    });
+    
+    document.body.addEventListener('click', (e) => {
+        const link = e.target.closest('.service-btn-link');
+        if (link) {
+            const serviceId = link.dataset.serviceId;
+            // Find the category of the service to navigate to
+            const service = awsData.services[serviceId];
+            if (service && service.categoryId) {
+                switchView('categories');
+                populateServices(service.categoryId);
+                displayServiceDetails(serviceId);
+            }
+        }
+    });
+
+    conceptBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            conceptBtns.forEach(b => {
+                b.classList.remove('bg-teal-600', 'text-white');
+                b.classList.add('bg-white', 'text-gray-900', 'hover:bg-gray-100');
+            });
+            btn.classList.add('bg-teal-600', 'text-white');
+            btn.classList.remove('bg-white', 'text-gray-900', 'hover:bg-gray-100');
+            displayConcept(btn.dataset.concept);
+        });
+    });
+
+    frameworkPillarsContainer.addEventListener('click', (e) => {
+        const card = e.target.closest('.framework-pillar-card');
+        if (card) {
+            frameworkPillarsContainer.querySelectorAll('.framework-pillar-card').forEach(c => {
+                c.classList.remove('border-2', 'border-teal-500', 'scale-105');
+            });
+            card.classList.add('border-2', 'border-teal-500', 'scale-105');
+            displayFrameworkDetail(card.dataset.pillarId);
+        }
+    });
+
+    // Initial Population
+    switchView('categories');
+    populateCategories();
+    populatePatterns();
+    displayConcept('security'); // Default concept view on load
+    populateFramework();
+});
+</script>
+</body>
+</html>
