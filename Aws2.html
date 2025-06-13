@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWS Resource Relationships</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            color: #333;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #34495e;
+            border-bottom: 2px solid #ccc;
+            padding-bottom: 5px;
+            margin-top: 30px;
+        }
+        h3 {
+            color: #2980b9;
+            margin-top: 20px;
+        }
+        ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        li {
+            margin-bottom: 5px;
+        }
+        .resource-list {
+            margin-left: 20px;
+        }
+        .resource-list li {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+        .relationship {
+            font-size: 0.9em;
+            color: #555;
+            margin-left: 15px;
+        }
+        a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        nav {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        nav ul {
+            display: inline-block;
+            padding: 0;
+            list-style: none;
+        }
+        nav li {
+            display: inline-block;
+            margin: 0 10px;
+        }
+        .category-container {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 25px;
+            background-color: #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+    </style>
+</head>
+<body>
+
+    <h1>AWS Resource Relationships Diagram (Text-Based)</h1>
+
+    <nav>
+        <ul>
+            <li><a href="#compute">Compute</a></li>
+            <li><a href="#containers">Containers</a></li>
+            <li><a href="#data">Data</a></li>
+            <li><a href="#iam">IAM</a></li>
+            <li><a href="#kubernetes">Kubernetes</a></li>
+            <li><a href="#management">Management</a></li>
+            <li><a href="#network">Network</a></li>
+            <li><a href="#security">Security</a></li>
+            <li><a href="#analytics">Analytics</a></li>
+        </ul>
+    </nav>
+
+    <div id="compute" class="category-container">
+        <h2>I. Compute Resources</h2>
+        <ul class="resource-list">
+            <li><strong>Auto Scaling Groups (AG)</strong>
+                <ul class="relationship">
+                    <li>Uses: Launch Configurations (LC), Launch Templates (LT)</li>
+                    <li>Manages: EC2 Instances (EC2_Inst)</li>
+                </ul>
+            </li>
+            <li><strong>EBS Snapshots (EBS_Snap)</strong>
+                <ul class="relationship">
+                    <li>Created from: EBS Volumes (EBS_Vol)</li>
+                </ul>
+            </li>
+            <li><strong>EBS Volume (EBS_Vol)</strong>
+                <ul class="relationship">
+                    <li>Attached to: EC2 Instances (EC2_Inst)</li>
+                    <li>Creates: EBS Snapshots (EBS_Snap)</li>
+                </ul>
+            </li>
+            <li><strong>EC2 Images (EC2_Img)</strong>
+                <ul class="relationship">
+                    <li>Used by: EC2 Instances (EC2_Inst), Launch Configurations (LC), Launch Templates (LT)</li>
+                </ul>
+            </li>
+            <li><strong>EC2 Instances (EC2_Inst)</strong>
+                <ul class="relationship">
+                    <li>Belongs to: Auto Scaling Groups (AG)</li>
+                    <li>Uses: EBS Volumes (EBS_Vol), EC2 Images (EC2_Img)</li>
+                    <li>Connected to: Security Groups (SG), Subnets, Network Interfaces (Net_Int)</li>
+                    <li>Run by: Elastic Beanstalk Environments (EB_Env), AWS Batch, ECS Services (ECS_Svc), EKS Clusters (EKS_Clust), EMR</li>
+                </ul>
+            </li>
+            <li><strong>Elastic Beanstalk Environments (EB_Env)</strong>
+                <ul class="relationship">
+                    <li>Deploys to: EC2 Instances (EC2_Inst), Load Balancers (LB), Auto Scaling Groups (AG)</li>
+                </ul>
+            </li>
+            <li><strong>Lambda Functions (Lambda)</strong>
+                <ul class="relationship">
+                    <li>Triggered by/Interacts with: S3 Buckets (S3), DynamoDB Tables (DDB_Table), Kinesis Data Streams (Kinesis_DS), API Gateway APIs (API_GW), Secrets Manager Secrets (Secrets_Mgr), System Manager Parameters (SSM_Param)</li>
+                    <li>Connects to: VPC Endpoints (VPC_EP)</li>
+                </ul>
+            </li>
+            <li><strong>Launch Configurations (LC)</strong>
+                <ul class="relationship">
+                    <li>Used by: Auto Scaling Groups (AG)</li>
+                    <li>References: EC2 Images (EC2_Img)</li>
+                </ul>
+            </li>
+            <li><strong>Launch Templates (LT)</strong>
+                <ul class="relationship">
+                    <li>Used by: Auto Scaling Groups (AG)</li>
+                    <li>References: EC2 Images (EC2_Img)</li>
+                </ul>
+            </li>
+            <li><strong>AWS Batch</strong>
+                <ul class="relationship">
+                    <li>Uses: EC2 Instances (EC2_Inst), EFS File Systems (EFS)</li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <div id="containers" class="category-container">
+        <h2>II. Containers Resources</h2>
+        <ul class="resource-list">
+            <li><strong>Container Images (Cont_Img)</strong>
+                <ul class="relationship">
+                    <li>Stored in: ECR Repositories (ECR_Repo)</li>
+                    <li>Referenced by: ECS Task Definitions (ECS_TD)</li>
+                </ul>
+            </li>
+            <li><strong>ECR Repositories (ECR_Repo)</strong>
+                <ul class="relationship">
+                    <li>Stores: Container Images (Cont_Img)</li>
+                </ul>
+            </li>
+            <li><strong>ECS Services (ECS_Svc)</strong>
+                <ul class="relationship">
+                    <li>Uses: ECS Task Definitions (ECS_TD), Load Balancers (LB)</li>
+                    <li>Runs on: EC2 Instances (EC2_Inst)</li>
+                </ul>
+            </li>
+            <li><strong>ECS Task Definitions (ECS_TD)</strong>
+                <ul class="relationship">
+                    <li>Defines: Container Images (Cont_Img)</li>
+                    <li>Used by: ECS Services (ECS_Svc)</li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <div id="data" class="category-container">
+        <h2>III. Data Resources</h2>
+        <ul class="resource-list">
+            <li><strong>Athena Workgroups (Athena_WG)</strong>
+                <ul class="relationship">
+                    <li>Queries: S3 Buckets (S3)</li>
+                </ul>
+            </li>
+            <li><strong>Data Firehose Streams (Firehose)</strong>
+                <ul class="relationship">
+                    <li>Receives data from: Kinesis Data Streams (Kinesis_DS)</li>
+                    <li>Delivers to: S3 Buckets (S3), OpenSearch Domains, etc.</li>
+                </ul>
+            </li>
+            <li><strong>DMS Database Migration Tasks (DMS_Task)</strong>
+                <ul class="relationship">
+                    <li>Uses: DMS Endpoints (DMS_EP), DMS Replication Instances (DMS_RI)</li>
+                </ul>
+            </li>
+            <li><strong>DMS Endpoints (DMS_EP)</strong>
+                <ul class="relationship">
+                    <li>Can be: RDS Instances (RDS_Inst), S3 Buckets (S3)</li>
+                    <li>Used by: DMS Database Migration Tasks (DMS_Task)</li>
+                </ul>
+            </li>
+            <li><strong>DMS Replication Instances (DMS_RI)</strong>
+                <ul class="relationship">
+                    <li>Used by: DMS Database Migration Tasks (DMS_Task)</li>
+                </ul>
+            </li>
+            <li><strong>DocumentDB Cluster Snapshots (DocDB_Snap)</strong>
+                <ul class="relationship">
+                    <li>Created from: DocumentDB Clusters (DocDB_Clust)</li>
+                </ul>
+            </li>
+            <li><strong>DocumentDB Clusters (DocDB_Clust)</strong>
+                <ul class="relationship">
+                    <li>Contains: DocumentDB Instances (DocDB_Inst)</li>
+                    <li>Creates: DocumentDB Cluster Snapshots (DocDB_Snap)</li>
+                </ul>
+            </li>
+            <li><strong>DocumentDB Instances (DocDB_Inst)</strong>
+                <ul class="relationship">
+                    <li>Part of: DocumentDB Clusters (DocDB_Clust)</li>
+                </ul>
+            </li>
+            <li><strong>DynamoDB Tables (DDB_Table)</strong>
+                <ul class="relationship">
+                    <li>Can use: KMS Keys (KMS_Keys) for encryption</li>
+                    <li>Interacted with by: Lambda Functions (Lambda), QuickSight</li>
+                </ul>
+            </li>
+            <li><strong>EFS File Systems (EFS)</strong>
+                <ul class="relationship">
+                    <li>Connected to: VPCs, Mount Targets</li>
+                    <li>Used by: AWS Batch</li>
+                </ul>
+            </li>
+            <li><strong>ElasticCache Redis OSS Caches (ElastiCache)</strong>
+                <ul class="relationship">
+                    <li>Deployed in: Subnets</li>
+                    <li>Protected by: Security Groups (SG)</li>
+                    <li>Within: VPCs</li>
+                </ul>
+            </li>
+            <li><strong>Kinesis Data Streams (Kinesis_DS)</strong>
+                <ul class="relationship">
+                    <li>Used by: Lambda Functions (Lambda), Data Firehose Streams (Firehose)</li>
+                </ul>
+            </li>
+            <li><strong>OpenSearch Domains (OpenSearch)</strong>
+                <ul class="relationship">
+                    <li>Deployed on: EC2 Instances (EC2_Inst)</li>
+                    <li>Within: VPCs</li>
+                </ul>
+            </li>
+            <li><strong>RDS Aurora Global Clusters (RDS_Aurora_GC)</strong>
+                <ul class="relationship">
+                    <li>Composed of: RDS Clusters (RDS_Clust)</li>
+                </ul>
+            </li>
+            <li><strong>RDS Clusters (RDS_Clust)</strong>
+                <ul class="relationship">
+                    <li>Contains: RDS Instances (RDS_Inst)</li>
+                    <li>Creates: RDS Snapshots (RDS_Snap)</li>
+                    <li>Deployed in: Subnets</li>
+                    <li>Can use: KMS Keys (KMS_Keys)</li>
+                    <li>Part of: RDS Aurora Global Clusters (RDS_Aurora_GC)</li>
+                </ul>
+            </li>
+            <li><strong>RDS Instances (RDS_Inst)</strong>
+                <ul class="relationship">
+                    <li>Part of: RDS Clusters (RDS_Clust)</li>
+                    <li>Protected by: Security Groups (SG)</li>
+                    <li>Deployed in: Subnets</li>
+                    <li>Can be: DMS Endpoints (DMS_EP)</li>
+                    <li>Accessed by: Secrets Manager Secrets (Secrets_Mgr), QuickSight</li>
+                </ul>
+            </li>
+            <li><strong>RDS Snapshots (RDS_Snap)</strong>
+                <ul class="relationship">
+                    <li>Created from: RDS Clusters (RDS_Clust)</li>
+                </ul>
+            </li>
+            <li><strong>S3 Buckets (S3)</strong>
+                <ul class="relationship">
+                    <li>Used by/Stores data for: Lambda Functions (Lambda), Data Firehose Streams (Firehose), Athena Workgroups (Athena_WG), CloudFormation Stacks (CF_Stack), CloudTrail Trails (CloudTrail), CloudFront Distributions (CloudFront), Glue, EMR, QuickSight, DMS Endpoints (DMS_EP)</li>
+                    <li>Can use: KMS Keys (KMS_Keys) for encryption</li>
+                    <li>Accessed via: VPC Endpoints (VPC_EP)</li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <div id="iam" class="category-container">
+        <h2>IV. IAM Resources</h2>
+        <ul class="resource-list">
+            <li><strong>IAM Groups (IAM_Group)</strong>
+                <ul class="relationship">
+                    <li>Contains: IAM Users (IAM_User)</li>
+                    <li>Assigned: IAM Policies (IAM_Policy)</li>
+                </ul>
+            </li>
+            <li><strong>IAM Policies (IAM_Policy)</strong>
+                <ul class="relationship">
+                    <li>Attached to: IAM Users (IAM_User), IAM Groups (IAM_Group), IAM Roles (IAM_Role)</li>
+                    <li>Define permissions for: AWS Services (Services)</li>
+                </ul>
+            </li>
+            <li><strong>IAM Roles (IAM_Role)</strong>
+                <ul class="relationship">
+                    <li>Assigned: IAM Policies (IAM_Policy)</li>
+                    <li>Used by: AWS Services (Services)</li>
+                </ul>
+            </li>
+            <li><strong>IAM Server Certificates (IAM_Cert)</strong>
+                <ul class="relationship">
+                    <li>*(Primarily for older services, consider ACM Certificates for newer ones)*</li>
+                </ul>
+            </li>
+            <li><strong>IAM Users (IAM_User)</strong>
+                <ul class="relationship">
+                    <li>Belongs to: IAM Groups (IAM_Group)</li>
+                    <li>Assigned: IAM Policies (IAM_Policy)</li>
+                    <li>Related to: Root Users (Root_User)</li>
+                </ul>
+            </li>
+            <li><strong>Organization Policies (Org_Policy)</strong>
+                <ul class="relationship">
+                    <li>Applied to: Accounts</li>
+                </ul>
+            </li>
+            <li><strong>Root Users (Root_User)</strong>
+                <ul class="relationship">
+                    <li>Controls: Accounts</li>
+                </ul>
+            </li>
+            <li><strong>SSO Groups (SSO_Group)</strong>
+                <ul class="relationship">
+                    <li>Contains: SSO Users (SSO_User)</li>
+                    <li>Assigned: SSO Permission Sets (SSO_Perm_Set)</li>
+                </ul>
+            </li>
+            <li><strong>SSO Permission Sets (SSO_Perm_Set)</strong>
+                <ul class="relationship">
+                    <li>Assigned to: SSO Groups (SSO_Group)</li>
+                </ul>
+            </li>
+            <li><strong>SSO Users (SSO_User)</strong>
+                <ul class="relationship">
+                    <li>Belongs to: SSO Groups (SSO_Group)</li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <div id="kubernetes" class="category-container">
+        <h2>V. Kubernetes Resources</h2>
+        <ul class="resource-list">
+            <li><strong>Cluster Node Groups (Cluster_NG)</strong>
+                <ul class="relationship">
+                    <li>Part of: EKS Clusters (EKS_Clust)</li>
+                    <li>Composed of: EC2 Instances (EC2_Inst)</li>
+                </ul>
+            </li>
+            <li><strong>EKS Clusters (EKS_Clust)</strong>
+                <ul class="relationship">
+                    <li>Manages: Cluster Node Groups (Cluster_NG)</li>
+                    <li>Operates within: VPCs</li>
+                    <li>Integrates with: Load Balancers (LB), EC2 Instances (EC2_Inst)</li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <div id="management" class="category-container">
+        <h2>VI. Management Resources</h2>
+        <ul class="resource-list">
+            <li><strong>Accounts</strong>
+                <ul class="relationship">
+                    <li>Controlled by: Root Users (Root_User)</li>
+                    <li>Affected by: Organization Policies (Org_Policy)</li>
+                </ul>
+            </li>
+            <li><strong>CloudFormation Stacks (CF_Stack)</strong>
+                <ul class="relationship">
+                    <li>Provisions/Manages: AWS Services (Services)</li>
+                    <li>Can store templates in: S3 Buckets (S3)</li>
+                </ul>
+            </li>
+            <li><strong>CloudTrail Trails (CloudTrail)</strong>
+                <ul class="relationship">
+                    <li>Records activity for: Accounts, AWS Services (Services)</li>
+                    <li>Stores logs in: S3 Buckets (S3)</li>
+                    <li>Can use: KMS Keys (KMS_Keys) for encryption</li>
+                </ul>
+            </li>
+            <li><strong>Services</strong>
+                <ul class="relationship">
+                    <li>Accessed/Managed by: IAM Policies (IAM_Policy), IAM Roles (IAM_Role)</li>
+                    <li>Provisioned by: CloudFormation Stacks (CF_Stack)</li>
+                    <li>Monitored by: CloudTrail Trails (CloudTrail)</li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <div id="network" class="category-container">
+        <h2>VII. Network Resources</h2>
+        <ul class="resource-list">
+            <li><strong>API Gateway APIs (API_GW)</strong>
+                <ul class="relationship">
+                    <li>Triggers: Lambda Functions (Lambda)</li>
+                    <li>Integrates with: EC2 Instances (EC2_Inst), VPC Endpoints (VPC_EP)</li>
+                    <li>Protected by: WAF Web ACLs (WAF_ACL)</li>
+                    <li>Accessed via: CloudFront Distributions (CloudFront)</li>
+                </ul>
+            </li>
+            <li><strong>CloudFront Distributions (CloudFront)</strong>
+                <ul class="relationship">
+                    <li>Sources from: S3 Buckets (S3), Load Balancers (LB), API Gateway APIs (API_GW)</li>
+                    <li>Protected by: WAF Web ACLs (WAF_ACL)</li>
+                    <li>DNS managed by: Route53 Hosted Zones (R53_HZ)</li>
+                    <li>Uses: ACM Certificates (ACM_Cert)</li>
+                </ul>
+            </li>
+            <li><strong>EC2 Elastic Ips (EC2_EIP)</strong>
+                <ul class="relationship">
+                    <li>Attached to: NAT Gateways (NAT_GW), EC2 Instances</li>
+                </ul>
+            </li>
+            <li><strong>Internet Gateways (IGW)</strong>
+                <ul class="relationship">
+                    <li>Attached to: VPCs</li>
+                </ul>
+            </li>
+            <li><strong>Load Balancers (LB)</strong>
+                <ul class="relationship">
+                    <li>Routes traffic to: EC2 Instances (EC2_Inst), ECS Services (ECS_Svc), EKS Clusters (EKS_Clust)</li>
+                    <li>Protected by: WAF Web ACLs (WAF_ACL), Security Groups (SG)</li>
+                    <li>Uses: ACM Certificates (ACM_Cert)</li>
+                    <li>DNS managed by: Route53 Hosted Zones (R53_HZ)</li>
+                    <li>Deployed in: Subnets</li>
+                    <li>Used by: Elastic Beanstalk Environments (EB_Env)</li>
+                </ul>
+            </li>
+            <li><strong>NAT Gateways (NAT_GW)</strong>
+                <ul class="relationship">
+                    <li>Deployed in: Subnets</li>
+                    <li>Uses: EC2 Elastic Ips (EC2_EIP)</li>
+                </ul>
+            </li>
+            <li><strong>Network ACLs (NACL)</strong>
+                <ul class="relationship">
+                    <li>Controls traffic for: Subnets</li>
+                    <li>Part of: VPCs</li>
+                </ul>
+            </li>
+            <li><strong>Network Interfaces (Net_Int)</strong>
+                <ul class="relationship">
+                    <li>Attached to: EC2 Instances (EC2_Inst)</li>
+                </ul>
+            </li>
+            <li><strong>Route Tables (RT)</strong>
+                <ul class="relationship">
+                    <li>Associated with: Subnets</li>
+                    <li>Part of: VPCs</li>
+                </ul>
+            </li>
+            <li><strong>Route53 Hosted Zones (R53_HZ)</strong>
+                <ul class="relationship">
+                    <li>Manages DNS for: Load Balancers (LB), CloudFront Distributions (CloudFront), VPCs</li>
+                </ul>
+            </li>
+            <li><strong>Security Groups (SG)</strong>
+                <ul class="relationship">
+                    <li>Attached to: EC2 Instances (EC2_Inst), Load Balancers (LB), RDS Instances (RDS_Inst), ElastiCache, EFS</li>
+                    <li>Part of: VPCs</li>
+                </ul>
+            </li>
+            <li><strong>Subnets</strong>
+                <ul class="relationship">
+                    <li>Part of: VPCs</li>
+                    <li>Contains: EC2 Instances (EC2_Inst), Load Balancers (LB), RDS Instances (RDS_Inst), ElastiCache, NAT Gateways (NAT_GW)</li>
+                    <li>Associated with: Route Tables (RT), Network ACLs (NACL)</li>
+                </ul>
+            </li>
+            <li><strong>VPC Block Public Access Settings (VPC_BPA)</strong>
+                <ul class="relationship">
+                    <li>Applied to: VPCs</li>
+                </ul>
+            </li>
+            <li><strong>VPC Endpoints (VPC_EP)</strong>
+                <ul class="relationship">
+                    <li>Connects: VPCs to AWS Services (e.g., S3 Buckets, Lambda Functions, API Gateway APIs)</li>
+                </ul>
+            </li>
+            <li><strong>VPC Peering Connections (VPC_Peering)</strong>
+                <ul class="relationship">
+                    <li>Connects: VPCs</li>
+                </ul>
+            </li>
+            <li><strong>VPCs (VPC)</strong>
+                <ul class="relationship">
+                    <li>Contains: Subnets, Internet Gateways (IGW), Route Tables (RT), Network ACLs (NACL), Security Groups (SG), VPC Endpoints (VPC_EP), VPC Block Public Access Settings (VPC_BPA)</li>
+                    <li>Connected via: VPC Peering Connections (VPC_Peering), Direct Connect</li>
+                    <li>Hosts: EFS File Systems (EFS), ElastiCache, OpenSearch Domains, EKS Clusters (EKS_Clust)</li>
+                </ul>
+            </li>
+            <li><strong>WAF Web ACLs (WAF_ACL)</strong>
+                <ul class="relationship">
+                    <li>Protects: CloudFront Distributions (CloudFront), API Gateway APIs (API_GW), Load Balancers (LB)</li>
+                </ul>
+            </li>
+            <li><strong>Direct Connect</strong>
+                <ul class="relationship">
+                    <li>Connects: On-premises networks to VPCs</li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <div id="security" class="category-container">
+        <h2>VIII. Security Resources</h2>
+        <ul class="resource-list">
+            <li><strong>ACM Certificates (ACM_Cert)</strong>
+                <ul class="relationship">
+                    <li>Used by: Load Balancers (LB), CloudFront Distributions (CloudFront)</li>
+                </ul>
+            </li>
+            <li><strong>KMS Keys (KMS_Keys)</strong>
+                <ul class="relationship">
+                    <li>Used for encryption by: S3 Buckets (S3), DynamoDB Tables (DDB_Table), RDS Clusters (RDS_Clust), Secrets Manager Secrets (Secrets_Mgr), CloudTrail Trails (CloudTrail)</li>
+                </ul>
+            </li>
+            <li><strong>Secrets Manager Secrets (Secrets_Mgr)</strong>
+                <ul class="relationship">
+                    <li>Stores credentials for: RDS Instances (RDS_Inst), various applications</li>
+                    <li>Accessed by: Lambda Functions (Lambda)</li>
+                    <li>Can use: KMS Keys (KMS_Keys)</li>
+                </ul>
+            </li>
+            <li><strong>System Manager Parameters (SSM_Param)</strong>
+                <ul class="relationship">
+                    <li>Stores configuration data for: Lambda Functions (Lambda), EC2 Instances (EC2_Inst)</li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <div id="analytics" class="category-container">
+        <h2>IX. Analytics Resources</h2>
+        <ul class="resource-list">
+            <li><strong>Kinesis (Kinesis_Analytics)</strong>
+                <ul class="relationship">
+                    <li>Refers to: Kinesis Data Streams (Kinesis_DS) for analytics.</li>
+                </ul>
+            </li>
+            <li><strong>Glue</strong>
+                <ul class="relationship">
+                    <li>Processes data in: S3 Buckets (S3), DynamoDB Tables (DDB_Table)</li>
+                    <li>Can run on: EC2 Instances (EC2_Inst)</li>
+                </ul>
+            </li>
+            <li><strong>Athena (Athena_Analytics)</strong>
+                <ul class="relationship">
+                    <li>Queries data in: S3 Buckets (S3)</li>
+                    <li>Used by: QuickSight</li>
+                </ul>
+            </li>
+            <li><strong>EMR Elastic MapReduce (EMR)</strong>
+                <ul class="relationship">
+                    <li>Runs on: EC2 Instances (EC2_Inst)</li>
+                    <li>Processes data in: S3 Buckets (S3)</li>
+                </ul>
+            </li>
+            <li><strong>QuickSight</strong>
+                <ul class="relationship">
+                    <li>Visualizes data from: Athena (Athena_Analytics), S3 Buckets (S3), RDS Instances (RDS_Inst), DynamoDB Tables (DDB_Table)</li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+</body>
+</html>
