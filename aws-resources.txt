@@ -1,0 +1,94 @@
+create relationship diagram between the aws resources given below under categories
+
+Compute:
+Auto Scaling Groups,
+EBS Snapshots,
+EBS Volume,
+EC2 Images,
+EC2 Instances,
+Elastic Beanstalk Environments,
+Lambda Functions,
+Launch Configurations,
+Launch Templates,
+AWS Batch
+
+Containers:
+Container Images,
+ECR Repositories,
+ECS Services,
+ECS Task Definitions
+
+Data:
+Athena Workgroups,
+Data Firehose Streams,
+DMS Database Migration Tasks,
+DMS Endpoints,
+DMS Replication Instances,
+DocumentDB Cluster Snapshots,
+DocumentDB Clusters,
+DocumentDB Instances,
+DynamoDB Tables,
+EFS File Systems,
+ElasticCache Redis OSS Caches,
+Kinesis Data Streams,
+OpenSearch Domains,
+RDS Aurora Global Clusters,
+RDS Clusters,
+RDS Instances,
+RDS Snapshots,
+S3 Buckets
+
+IAM:
+IMA Groups,
+IAM Policies,
+IAM Roles,
+IAM Server Certificates,
+IAM Users,
+Organization Policies,
+Root Users,
+SSO Groups,
+SSO Permission Sets,
+SSO Users
+
+Kubernetes:
+Cluster Node Groups,
+EKS Clusters,
+
+Management:
+Accounts,
+CloudFormation Stacks,
+CloudTrail Trails,
+Services
+
+Network:
+API Gateway APIs,
+CloudFront Distributions,
+EC2 Elastic Ips,
+Internet Gateways,
+Load Balancers,
+NAT Gateways,
+Network ACLs,
+Network Interfaces,
+Route Tables,
+Route53 Hosted Zones,
+Security Groups,
+Subnets,
+VPC Block Public Access Settings,
+VPC Endpoints,
+VPC Peering Connections,
+VPCs,
+EAF Web ACLs,
+Direct Connect
+
+Security:
+ACM Certificates,
+KMS Keys,
+Secrets Manager Secrets,
+System Manager Parameters,
+
+Analytics:
+Kinesis,
+Glue,
+Athena,
+EMR Elastic MapReduce,
+QuickSight
